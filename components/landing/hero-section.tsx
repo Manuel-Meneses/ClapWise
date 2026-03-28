@@ -4,81 +4,170 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import { AnimatedSphere } from "./animated-sphere";
-import { ChatSimulator } from "./chat-simulator";
 
-const words = ["Filtra", "Atiende", "Agenda", "Vende"];
+const words = ["create", "build", "scale", "ship"];
 
 export function HeroSection() {
   const [isVisible, setIsVisible] = useState(false);
   const [wordIndex, setWordIndex] = useState(0);
 
-  useEffect(() => { setIsVisible(true); }, []);
   useEffect(() => {
-    const interval = setInterval(() => setWordIndex((prev) => (prev + 1) % words.length), 2500);
+    setIsVisible(true);
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setWordIndex((prev) => (prev + 1) % words.length);
+    }, 2500);
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <section className="relative min-h-screen flex flex-col justify-center overflow-hidden bg-background">
-     <div className="hidden lg:flex items-center justify-center w-[500px] h-[600px]">
-   <ChatSimulator />
-    </div> 
+    // Se añade pt-32 y lg:pt-48 para mantener distancia con el navbar
+    <section className="relative min-h-screen flex flex-col overflow-hidden pt-32 lg:pt-48 pb-20">
       
-      <div className="relative z-10 max-w-[1400px] mx-auto px-6 lg:px-12 py-32 lg:py-40">
-        <div className={`mb-8 transition-all duration-700 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
-          <span className="inline-flex items-center gap-3 text-sm font-mono text-primary font-semibold uppercase tracking-wider">
-            <span className="w-8 h-px bg-primary" />
-            La evolución de la atención al cliente
-          </span>
-        </div>
-        
-        <div className="mb-12">
-          <h1 className={`text-[clamp(3rem,10vw,8rem)] font-display leading-[0.9] tracking-tight text-foreground transition-all duration-1000 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
-            <span className="block">El asistente que</span>
-            <span className="block">
-              <span className="relative inline-block text-primary">
-                <span key={wordIndex} className="inline-flex">
-                  {words[wordIndex].split("").map((char, i) => (
-                    <span key={`${wordIndex}-${i}`} className="inline-block animate-char-in" style={{ animationDelay: `${i * 50}ms` }}>
-                      {char}
-                    </span>
-                  ))}
-                </span>
-                <span className="absolute -bottom-2 left-0 right-0 h-3 bg-secondary/30" />
-              </span>
-              {" "}por tu negocio.
-            </span>
-          </h1>
-        </div>
-        
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-24 items-end">
-          <p className={`text-xl lg:text-2xl text-muted-foreground leading-relaxed max-w-xl transition-all duration-700 delay-200 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
-            Sistemas de IA integrados a tu WhatsApp que califican clientes y agendan turnos automáticamente. <strong>Deja de perder dinero fuera del horario comercial.</strong>
-          </p>
+      {/* Líneas de fondo sutiles */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-30">
+        {[...Array(8)].map((_, i) => (
+          <div
+            key={`h-${i}`}
+            className="absolute h-px bg-foreground/10"
+            style={{
+              top: `${12.5 * (i + 1)}%`,
+              left: 0,
+              right: 0,
+            }}
+          />
+        ))}
+        {[...Array(12)].map((_, i) => (
+          <div
+            key={`v-${i}`}
+            className="absolute w-px bg-foreground/10"
+            style={{
+              left: `${8.33 * (i + 1)}%`,
+              top: 0,
+              bottom: 0,
+            }}
+          />
+        ))}
+      </div>
+      
+      <div className="relative z-10 max-w-[1400px] mx-auto px-6 lg:px-12 w-full">
+        {/* Contenedor Grid: Texto a la izquierda, Visual a la derecha */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
           
-          <div className={`flex flex-col sm:flex-row items-start gap-4 transition-all duration-700 delay-300 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
-            <Button size="lg" className="bg-primary hover:bg-primary/90 text-white px-8 h-14 text-base rounded-full shadow-lg shadow-primary/25 group">
-              Solicitar Demostración
-              <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
-            </Button>
+          {/* Columna Izquierda: Texto */}
+          <div className="flex flex-col">
+            {/* Eyebrow */}
+            <div 
+              className={`mb-8 transition-all duration-700 ${
+                isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+              }`}
+            >
+              <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground">
+                <span className="w-8 h-px bg-foreground/30" />
+                The platform for modern teams
+              </span>
+            </div>
+            
+            {/* Main headline */}
+            <div className="mb-8">
+              <h1 
+                className={`text-[clamp(2.5rem,8vw,6rem)] font-display leading-[1] tracking-tight transition-all duration-1000 ${
+                  isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+                }`}
+              >
+                <span className="block">The platform</span>
+                <span className="block">
+                  to{" "}
+                  <span className="relative inline-block">
+                    <span 
+                      key={wordIndex}
+                      className="inline-flex"
+                    >
+                      {words[wordIndex].split("").map((char, i) => (
+                        <span
+                          key={`${wordIndex}-${i}`}
+                          className="inline-block animate-char-in"
+                          style={{
+                            animationDelay: `${i * 50}ms`,
+                          }}
+                        >
+                          {char}
+                        </span>
+                      ))}
+                    </span>
+                    <span className="absolute -bottom-2 left-0 right-0 h-3 bg-foreground/10" />
+                  </span>
+                </span>
+              </h1>
+            </div>
+            
+            {/* Description */}
+            <div className={`transition-all duration-700 delay-200 ${
+              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+            }`}>
+              <p className="text-xl text-muted-foreground leading-relaxed max-w-xl mb-10">
+                Your toolkit to stop configuring and start innovating. 
+                Securely build, deploy, and scale the best experiences.
+              </p>
+              
+              {/* CTAs */}
+              <div className="flex flex-col sm:flex-row items-start gap-4">
+                <Button 
+                  size="lg" 
+                  className="bg-foreground hover:bg-foreground/90 text-background px-8 h-14 text-base rounded-full group w-full sm:w-auto"
+                >
+                  Start free trial
+                  <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
+                </Button>
+                <Button 
+                  size="lg" 
+                  variant="outline" 
+                  className="h-14 px-8 text-base rounded-full border-foreground/20 hover:bg-foreground/5 w-full sm:w-auto"
+                >
+                  Watch demo
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Columna Derecha: Elemento Visual (Celular / AnimatedSphere) */}
+          <div 
+            className={`relative flex justify-center items-center transition-all duration-1000 delay-300 ${
+              isVisible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-12"
+            }`}
+          >
+            <div className="w-full aspect-square max-w-[500px] lg:max-w-[700px] relative">
+              {/* Resplandor de fondo para el visual */}
+              <div className="absolute inset-0 bg-foreground/5 blur-[120px] rounded-full" />
+              <AnimatedSphere />
+            </div>
           </div>
         </div>
       </div>
       
-      {/* Métricas de negocio */}
-      <div className={`absolute bottom-0 left-0 right-0 bg-muted transition-all duration-700 delay-500 ${isVisible ? "opacity-100" : "opacity-0"}`}>
-        <div className="flex gap-16 marquee whitespace-nowrap py-6">
+      {/* Stats marquee - Ajustado para no interferir con el grid */}
+      <div 
+        className={`mt-24 transition-all duration-700 delay-500 ${
+          isVisible ? "opacity-100" : "opacity-0"
+        }`}
+      >
+        <div className="flex gap-16 marquee whitespace-nowrap border-y border-foreground/5 py-8">
           {[...Array(2)].map((_, i) => (
             <div key={i} className="flex gap-16">
               {[
-                { value: "24/7", label: "Atención ininterrumpida" },
-                { value: "100%", label: "Leads pre-calificados" },
-                { value: "0", label: "Mensajes ignorados" },
-                { value: "Automático", label: "Agendamiento y recordatorios" },
-              ].map((stat, idx) => (
-                <div key={`${idx}-${i}`} className="flex items-baseline gap-4">
-                  <span className="text-3xl lg:text-4xl font-display text-primary">{stat.value}</span>
-                  <span className="text-sm font-medium text-foreground">{stat.label}</span>
+                { value: "20 days", label: "saved on builds", company: "NETFLIX" },
+                { value: "98%", label: "faster deployment", company: "STRIPE" },
+                { value: "300%", label: "throughput increase", company: "LINEAR" },
+                { value: "6x", label: "faster to ship", company: "NOTION" },
+              ].map((stat) => (
+                <div key={`${stat.company}-${i}`} className="flex items-baseline gap-4">
+                  <span className="text-4xl lg:text-5xl font-display">{stat.value}</span>
+                  <span className="text-sm text-muted-foreground">
+                    {stat.label}
+                    <span className="block font-mono text-xs mt-1">{stat.company}</span>
+                  </span>
                 </div>
               ))}
             </div>
