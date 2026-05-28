@@ -21,9 +21,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Optimus - Platform to Create',
-  description: 'The creative platform for teams who ship. Build, deploy, and scale with unprecedented velocity.',
-  generator: 'v0.app',
+  title: 'ClapWise | Automatización y Chatbots con IA',
+  description: 'Atendemos a tus clientes y agendamos citas 24/7 en piloto automático. Escala tus ventas sin contratar más personal.',
+  generator: 'ClapWise',
 }
 
 export default function RootLayout({

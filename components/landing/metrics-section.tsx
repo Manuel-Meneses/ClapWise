@@ -38,17 +38,17 @@ function AnimatedCounter({ end, suffix = "", prefix = "" }: { end: number; suffi
   }, [end, hasAnimated]);
 
   return (
-    <div ref={ref} className="text-6xl lg:text-8xl font-display tracking-tight">
+    <div ref={ref} className="text-5xl lg:text-7xl font-display tracking-tight text-foreground">
       {prefix}{count.toLocaleString()}{suffix}
     </div>
   );
 }
 
 const metrics = [
-  { value: 12450, suffix: "", prefix: "+", label: "Leads calificados este mes" },
-  { value: 98, suffix: "%", prefix: "", label: "Tasa de respuesta inmediata" },
-  { value: 15, suffix: "s", prefix: "<", label: "Tiempo promedio de respuesta" },
-  { value: 35, suffix: "%", prefix: "+", label: "Aumento en citas agendadas" },
+  { value: 15, suffix: "%", prefix: "+", label: "Aumento promedio en márgenes de ganancia" },
+  { value: 48, suffix: "hs", prefix: "<", label: "Tiempo de entrega del diagnóstico inicial completo" },
+  { value: 100, suffix: "%", prefix: "", label: "Explicabilidad matemática (Cero modelos de caja negra)" },
+  { value: 0, suffix: "", prefix: "$", label: "Costo fijo de infraestructura informática para tu equipo" },
 ];
 
 export function MetricsSection() {
@@ -74,29 +74,25 @@ export function MetricsSection() {
   }, []);
 
   return (
-    <section id="studio" ref={sectionRef} className="relative py-24 lg:py-32 border-y border-foreground/10">
+    <section id="studio" ref={sectionRef} className="relative py-24 lg:py-32 border-y border-border">
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8 mb-16 lg:mb-24">
           <div>
             <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-6">
               <span className="w-8 h-px bg-foreground/30" />
-              Live metrics
+              Métricas de Control
             </span>
-            <h2
-              className={`text-4xl lg:text-6xl font-display tracking-tight transition-all duration-700 ${
-                isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-              }`}
-            >
-              Performance you
+            <h2 className={`text-4xl lg:text-6xl font-display tracking-tight text-foreground transition-all duration-700 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
+              Rendimiento comercial
               <br />
-              can measure.
+              comprobado con rigor analítico.
             </h2>
           </div>
           <div className="flex items-center gap-4 font-mono text-sm text-muted-foreground">
             <span className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              Live
+              Sistemas estables
             </span>
             <span className="text-foreground/30">|</span>
             <span>{time.toLocaleTimeString()}</span>
@@ -104,7 +100,7 @@ export function MetricsSection() {
         </div>
         
         {/* Metrics Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-foreground/10">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-border">
           {metrics.map((metric, index) => (
             <div
               key={metric.label}
@@ -114,11 +110,11 @@ export function MetricsSection() {
               style={{ transitionDelay: `${index * 100}ms` }}
             >
               <AnimatedCounter 
-                end={typeof metric.value === 'number' ? metric.value : 0} 
+                end={metric.value} 
                 suffix={metric.suffix} 
                 prefix={metric.prefix}
               />
-              <div className="mt-4 text-lg text-muted-foreground">{metric.label}</div>
+              <div className="mt-4 text-base text-muted-foreground">{metric.label}</div>
             </div>
           ))}
         </div>

@@ -1,16 +1,13 @@
-// app/page.tsx
 import { Navigation } from "@/components/landing/navigation";
 import { HeroSection } from "@/components/landing/hero-section";
 import { FeaturesSection } from "@/components/landing/features-section";
 import { HowItWorksSection } from "@/components/landing/how-it-works-section";
+import { SolutionsSection } from "@/components/landing/solutions-section"; // NUEVO
 import { MetricsSection } from "@/components/landing/metrics-section";
 import { IntegrationsSection } from "@/components/landing/integrations-section";
-import { TestimonialsSection } from "@/components/landing/testimonials-section";
 import { PricingSection } from "@/components/landing/pricing-section";
 import { CtaSection } from "@/components/landing/cta-section";
 import { FooterSection } from "@/components/landing/footer-section";
-
-// Eliminamos: InfrastructureSection, DevelopersSection y SecuritySection (al menos por ahora)
 
 export default function Home() {
   return (
@@ -19,9 +16,9 @@ export default function Home() {
       <HeroSection />
       <FeaturesSection />
       <HowItWorksSection />
+      <SolutionsSection /> {/* SE AÑADE AQUÍ */}
       <MetricsSection />
       <IntegrationsSection />
-      <TestimonialsSection />
       <PricingSection />
       <CtaSection />
       <FooterSection />
