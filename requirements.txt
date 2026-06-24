@@ -1,0 +1,9 @@
+pandas
+rapidfuzz
+supabase
+langchain
+langchain-google-genai
+langgraph
+python-dotenv
+beautifulsoup4
+requests
