@@ -22,17 +22,21 @@ except Exception as e:
 def filtrar_entropia(texto_caotico: str, client_id: str) -> dict:
     """
     Toma un bloque de texto con alta entropía (datos crudos), extrae un catálogo 
-    estructurado, calcula tensores semánticos de 3072 dimensiones y lo inyecta a Supabase.
-    
-    Retorna: Diccionario con el estado final de la operación.
+    estructurado incluyendo variantes, calcula tensores semánticos y lo inyecta a Supabase.
     """
-    print(f"\n[{client_id}] 1. 👁️ El Demonio de Maxwell está analizando el caos...")
+    print(f"\n[{client_id}] 1. 👁️ El Demonio de Maxwell está analizando el caos y extrayendo variantes...")
     
+    # 1. ACTUALIZAMOS LAS INSTRUCCIONES: Agregamos Talles y Colores
     instrucciones = """
-    Eres un procesador de datos estricto. Tu trabajo es extraer productos, precios y stock de un texto caótico.
-    Debes devolver ÚNICAMENTE un array en formato JSON puro con las claves: "nombre_consolidado" (en minúsculas), "precio" (número entero), "stock" (número entero).
-    Si no se menciona stock, asume 1. Si no hay precio, descarta el producto.
-    No uses formato markdown, no uses la palabra json, solo devuelve el array desde el corchete de apertura hasta el de cierre.
+    Eres un procesador de datos estricto. Tu trabajo es extraer productos de un texto caótico o código fuente HTML.
+    Debes devolver ÚNICAMENTE un array en formato JSON puro.
+    Cada objeto debe tener estas claves obligatorias: 
+    - "nombre_consolidado" (en minúsculas)
+    - "precio" (número entero)
+    - "stock" (número entero, asume 1 si no hay dato)
+    - "talles" (string, ej: "S, M, L" o "Único")
+    - "colores" (string, ej: "Rojo, Negro" o "No especificado")
+    No uses formato markdown, solo devuelve el array desde el corchete de apertura hasta el de cierre.
     """
     
     mensajes = [
@@ -40,55 +44,57 @@ def filtrar_entropia(texto_caotico: str, client_id: str) -> dict:
         HumanMessage(content=texto_caotico)
     ]
     
-    # 1. Fase de Extracción (LangChain puro, sin LangGraph)
     try:
         respuesta = llm.invoke(mensajes)
         texto_limpio = respuesta.content.strip().replace("```json", "").replace("```", "")
         productos_estructurados = json.loads(texto_limpio)
         print(f"[{client_id}] ✅ Entropía reducida. Se detectaron {len(productos_estructurados)} productos.")
         
-    except json.JSONDecodeError:
-        print(f"[{client_id}] ❌ Falla estructural: El LLM no devolvió un JSON válido.")
-        return {"status": "error", "message": "JSON inválido", "details": respuesta.content}
     except Exception as e:
         print(f"[{client_id}] ❌ Falla de procesamiento: {str(e)}")
         return {"status": "error", "message": "Error de LLM", "details": str(e)}
 
-    # 2. Fase de Vectorización e Inyección
-    print(f"[{client_id}] 2. 🧬 Calculando tensores e inyectando al núcleo de Supabase...")
+    print(f"[{client_id}] 2. 🧬 Calculando tensores enriquecidos e inyectando al núcleo...")
+    
+    # --- NUEVO BLOQUE DE LIMPIEZA ---
+    print(f"[{client_id}] 🧹 Limpiando catálogo viejo para evitar duplicados...")
+    try:
+        # Esto borra ÚNICAMENTE las filas de este cliente específico
+        supabase.table("productos").delete().eq("client_id", client_id).execute()
+    except Exception as e:
+        print(f"   ⚠️ Nota: El catálogo estaba vacío o hubo un error al limpiar: {str(e)}")
+    # ---------------------------------
+
     productos_inyectados = 0
     
-    for p in productos_estructurados:
+    for p in productos_estructurados: 
         try:
-            nombre = p.get('nombre_consolidado', 'producto_desconocido')
+            nombre_base = p.get('nombre_consolidado', 'producto_desconocido')
             precio = p.get('precio', 0)
             stock = p.get('stock', 1)
+            talles = p.get('talles', 'Único')
+            colores = p.get('colores', 'No especificado')
             
-            print(f"   -> Vectorizando: {nombre} | ${precio} | Stock: {stock}")
+            # 2. ENRIQUECIMIENTO SEMÁNTICO: Colapsamos las variables en un solo estado observable
+            nombre_enriquecido = f"{nombre_base} | Talles: {talles} | Colores: {colores}"
             
-            # Cálculo matemático de la distancia (3072 dimensiones)
-            vector = embeddings_model.embed_query(nombre)
+            print(f"   -> Vectorizando: {nombre_enriquecido} | ${precio} | Stock: {stock}")
+            
+            # El modelo ahora proyecta todo en 3072 dimensiones
+            vector = embeddings_model.embed_query(nombre_enriquecido)
             
             datos_db = {
                 "client_id": client_id,
-                "nombre_consolidado": nombre,
+                "nombre_consolidado": nombre_enriquecido,
                 "precio": precio,
                 "stock": stock,
                 "embedding": vector
             }
             
-            # Inyección a la base de datos
             supabase.table("productos").insert(datos_db).execute()
             productos_inyectados += 1
             
         except Exception as e:
-            print(f"   ❌ Error al inyectar el producto '{nombre}': {str(e)}")
+            print(f"   ❌ Error al inyectar: {str(e)}")
 
-    print(f"[{client_id}] 🎉 Proceso completado. {productos_inyectados} inyectados con éxito.")
-    
-    # 3. Retorno del reporte final
-    return {
-        "status": "success",
-        "productos_extraidos_total": len(productos_estructurados),
-        "productos_inyectados_exito": productos_inyectados
-    }
+    return {"status": "success", "productos_inyectados_exito": productos_inyectados}

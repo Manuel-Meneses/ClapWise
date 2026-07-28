@@ -1,51 +1,95 @@
 import requests
 from bs4 import BeautifulSoup
-from maxwell_demon.entropy_filter import filtrar_entropia
+import time
+import os
+from dotenv import load_dotenv
+from supabase import create_client
 
-def clonar_catalogo_web(url_tienda: str, client_id: str):
-    """
-    Extrae todo el texto visible de una URL y lo inyecta en el núcleo del sistema.
-    """
-    print(f"\n🌐 Iniciando clonación de: {url_tienda}")
+# Cargamos las credenciales desde tu archivo .env[cite: 4]
+load_dotenv()
+supabase = create_client(os.environ.get("SUPABASE_URL"), os.environ.get("SUPABASE_KEY"))
+
+def scraper_i2c_definitivo():
+    print("🚀 Iniciando extracción masiva adaptada a tu tabla exacta...")
     
+    # 🧹 PASO CLAVE: Vaciamos el catálogo viejo de i2c ANTES de empezar a raspar
     try:
-        # 1. Hacemos la petición a la web simulando ser un navegador normal
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
-        respuesta = requests.get(url_tienda, headers=headers, timeout=10)
-        respuesta.raise_for_status()
-        
-        # 2. Parseamos el HTML y destruimos los scripts y estilos (limpieza de ruido)
-        soup = BeautifulSoup(respuesta.text, 'html.parser')
-        for script in soup(["script", "style", "nav", "footer"]):
-            script.extract()
-            
-        # 3. Extraemos solo el texto puro
-        texto_crudo = soup.get_text(separator=' ', strip=True)
-        
-        # Cortamos un límite de caracteres para no saturar al LLM (aprox 30.000 caracteres)
-        texto_seguro = texto_crudo[:30000]
-        print(f"📦 Se extrajeron {len(texto_seguro)} caracteres de entropía pura.")
-        
-        # 4. Pasamos el caos por el filtro que ya construimos
-        resultado = filtrar_entropia(texto_seguro, client_id)
-        
-        if resultado["status"] == "success":
-            print(f"✅ ¡Clonación exitosa para {client_id}! Catálogo listo en Supabase.")
-        else:
-            print("❌ El Demonio no pudo procesar los datos.")
-            
+        print("Borrando lista de precios vieja del proveedor i2c...")
+        supabase.table("productos").delete().eq("client_id", "proveedor_i2c").execute()
+        print("✅ Base de datos limpia. Lista para recibir los precios de hoy.")
     except Exception as e:
-        print(f"❌ Error al intentar acceder a la web: {str(e)}")
+        print(f"🚨 Error al intentar limpiar la base de datos: {e}")
+        print("Frenando ejecución para evitar duplicados.")
+        return 
+
+    # Establecemos los encabezados y variables iniciales[cite: 4]
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    pagina = 1
+    total_ingresados = 0
+    
+    # Iniciamos el ciclo para recorrer las páginas[cite: 4]
+    while True:
+        url = "https://www.i2cmayorista.com/productos/" if pagina == 1 else f"https://www.i2cmayorista.com/productos/?page={pagina}"
+        print(f"📄 Procesando página {pagina}...")
+        
+        try:
+            respuesta = requests.get(url, headers=headers)
+        except Exception as e:
+            print(f"❌ Error de conexión: {e}")
+            break
+
+        soup = BeautifulSoup(respuesta.text, 'html.parser')
+        productos = soup.find_all(class_=lambda c: c and ('js-item-product' in c or 'item' == c))
+        
+        if not productos:
+            print("🏁 No se encontraron más contenedores. Fin del catálogo.")
+            break
+            
+        lote_repuestos = []
+        
+        for producto in productos:
+            etiqueta_nombre = producto.find(class_=lambda c: c and 'js-item-name' in c)
+            etiqueta_precio = producto.find(class_=lambda c: c and 'js-price-display' in c)
+            
+            if not etiqueta_nombre or not etiqueta_precio:
+                continue
+                
+            nombre = etiqueta_nombre.text.strip()
+            precio_texto = etiqueta_precio.text.strip()
+            
+            try:
+                precio_limpio = float(precio_texto.replace('$', '').replace('.', '').replace(',', '.'))
+            except ValueError:
+                continue
+                
+            if precio_limpio <= 0:
+                continue
+                
+            # Usamos las columnas EXACTAS de tu tabla[cite: 4]
+            producto_db = {
+                "client_id": "proveedor_i2c", 
+                "nombre_consolidado": nombre,
+                "precio": precio_limpio,
+                "stock": 99  # Stock ficticio alto porque es proveedor[cite: 4]
+            }
+            lote_repuestos.append(producto_db)
+        
+        if not lote_repuestos:
+            break
+            
+        # Inyectamos el lote en Supabase[cite: 4]
+        try:
+            supabase.table("productos").insert(lote_repuestos).execute()
+            total_ingresados += len(lote_repuestos)
+            print(f"✅ {len(lote_repuestos)} repuestos guardados.")
+        except Exception as e:
+            print(f"❌ Error al guardar en BD: {e}")
+            break
+        
+        pagina += 1
+        time.sleep(1) 
+        
+    print(f"\n🎉 ¡MISIÓN CUMPLIDA! Total de repuestos inyectados: {total_ingresados}")
 
 if __name__ == "__main__":
-    # Aquí configuras tu lista de los 10 clientes para que se ejecute en cadena
-    clientes_objetivo = [
-        {"id": "damelosiempre", "url": "https://www.damelosiempre.com.ar/productos"},
-        {"id": "tussyoff", "url": "https://tussy.com.ar/ropa"},
-        {"id": "baesics", "url": "https://baesics.ar/collections/all"},
-        {"id": "blunder", "url": "https://blunder.com.ar/drop-el-dia-arranca"},
-        {"id": "tussyoff", "url": "https://tussy.com.ar/ropa"},
-    ]
-    
-    for cliente in clientes_objetivo:
-        clonar_catalogo_web(cliente["url"], cliente["id"])
+    scraper_i2c_definitivo()
