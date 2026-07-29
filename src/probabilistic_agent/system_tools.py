@@ -45,9 +45,8 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
     # Podés cambiar el orden moviendo los nombres de lugar.
     PRIORIDAD_PROVEEDORES = [
         "proveedor_i2c", 
-        "proveedor_marcelo", 
-        "proveedor_tecnocell", 
-        "proveedor_pepe"
+        "proveedor_syphon", 
+        "proveedor_sintren"
     ]
 
     try:

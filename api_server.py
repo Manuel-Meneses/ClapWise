@@ -124,9 +124,9 @@ async def recibir_mensaje(request: Request):
 
 def enviar_mensaje_whatsapp(numero_destino, texto_respuesta):
     # 👇 PEGÁ ACÁ TU TOKEN LARGUÍSIMO DE META
-    TOKEN = "EAATkL1hn6uEBSArsF3XgcOsIQbVN1AoKtgv25eWmuWemZCL7MuLUZB6vWBA2NFY4RD7OWXM8biYJs7sITpTiZBdDGDTRay1JaSWiFlpmE6WTahqamBxwH4unidTEQQmZARrVE2mcgYA3suuBmnPT0HRZCiVIWtPdKr8zA6XHDII3MxufFHZA6PQ0tQ1lNDZBSxZAXNE6v88ZBam0SCgTqQlIlS9ajCkP1qDZAGI0S5XIQaI6noIJfeH6AqFPtAIyzZAjpbZBLwBCS8mb5xKqAiZA5ZCpKIuUhz"
+    TOKEN = "EAATkL1hn6uEBSPTZC9FmbM2y60F6OrQYQ00UXZB8RHhGUKYEpjwRNM8IEX7NBd3CtWWFBV9ZCHnP8nC4krB0XSGSEr5u5MYwWlKHaFjxrDUeAP5nZC5V7MI6CeGbOvehLprfc20BicCAUk0r6q3JxXCjQMk3iAiNMi0d94z1UgVR3aFeFnMkbszpuZC3UciURkSqTs8x6y9LLbqFialfzmJlOpQRiIZC2dHEjqOYjeSZBKMPxfro1m851j8FxhvW45c4VW9YUpolYj1g6U8D7eb286V"
     # Este es el ID de tu número de prueba que me pasaste arriba
-    PHONE_ID = "1164052283465960" 
+    PHONE_ID = "1271041542753450" 
     
     url = f"https://graph.facebook.com/v19.0/{PHONE_ID}/messages"
     
