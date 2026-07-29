@@ -124,7 +124,7 @@ async def recibir_mensaje(request: Request):
 
 def enviar_mensaje_whatsapp(numero_destino, texto_respuesta):
     # 👇 PEGÁ ACÁ TU TOKEN LARGUÍSIMO DE META
-    TOKEN = "EAATkL1hn6uEBSPTZC9FmbM2y60F6OrQYQ00UXZB8RHhGUKYEpjwRNM8IEX7NBd3CtWWFBV9ZCHnP8nC4krB0XSGSEr5u5MYwWlKHaFjxrDUeAP5nZC5V7MI6CeGbOvehLprfc20BicCAUk0r6q3JxXCjQMk3iAiNMi0d94z1UgVR3aFeFnMkbszpuZC3UciURkSqTs8x6y9LLbqFialfzmJlOpQRiIZC2dHEjqOYjeSZBKMPxfro1m851j8FxhvW45c4VW9YUpolYj1g6U8D7eb286V"
+    TOKEN = "EAATkL1hn6uEBSMlVD9wREiuZCZAiWmJj1GIqvSGLMZAk6IS1YsvWHgXGkTs7km75wbMSiLLXfRCBiTrBWcOWZB4RJFZAo16KXwtN7cGOJCkCPNDrfwJRbr8awTkhKVH3bhr0KFUuy4NMh9muWNY0yHIzwANScFxPV1yCZC9g6fcZBvpKnKT10rQmuF9R8x26SphigZDZD"
     # Este es el ID de tu número de prueba que me pasaste arriba
     PHONE_ID = "1271041542753450" 
     
