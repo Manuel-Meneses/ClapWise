@@ -32,24 +32,15 @@ memoria_global = MemorySaver()
 prompts_por_agente = {}
 
 def obtener_instrucciones_seguras(client_id: str) -> str:
-    """Busca las reglas en Supabase y arma el Prompt Maestro."""
-    try:
-        respuesta = supabase.table("configuracion_clientes").select("reglas_calculadora").eq("client_id", client_id).execute()
-        reglas_calculadora = respuesta.data[0]["reglas_calculadora"] if respuesta.data else ""
-    except Exception as e:
-        print(f"❌ Error al cargar calculadora: {e}") 
-        reglas_calculadora = "Error: No se pudieron cargar las reglas. Derivar a humano."
-
+    # (El try-except de reglas_calculadora déjalo igual)
+    
     contexto_negocio = ""
     if client_id == "3g_servicio":
-        contexto_negocio = f"""
+        contexto_negocio = """
         INFORMACIÓN ESTÁTICA DEL LOCAL (3G Servicio Técnico Oficial):
         - UBICACIÓN: Córdoba Capital, La Rioja 126. 
         - GANCHO COMERCIAL: Reparaciones en 1 HORA. Invitamos café en Bonafide a quienes sacan turno.
         - HORARIO: Lunes a Viernes de 9 a 18hs. Sábados de 9 a 13hs.
-        
-        REGLAS DE PRECIOS:
-        {reglas_calculadora}
         """
         
     return f"""
@@ -58,29 +49,23 @@ def obtener_instrucciones_seguras(client_id: str) -> str:
     
     {contexto_negocio}
     
-    PERSONALIDAD (ESTILO WHATSAPP DE CÓRDOBA/ARGENTINA):
-    - Eres amable, resolutivo y muy humano. 
-    - Usa palabras como "garrón", "bajón", "tranqui", "fijate", pero con respeto.
-    - RESPUESTAS CORTAS: Máximo 2-3 párrafos cortos. Nadie lee textos largos en WhatsApp.
-    - Usa negritas (*texto*) para resaltar precios o modelos, y emojis (📲, 🔧, ☕).
-    
     REGLAS DE ORO (INQUEBRANTABLES - EL EFECTO WOW):
-    1. EMPATÍA INICIAL: Si se rompió o no prende, lamenta la situación antes de vender.
-    2. NUNCA INVENTES PRECIOS: Usa la herramienta 'buscar_costo_repuesto_real'.
-    3. MANEJO DE AMBIGÜEDAD (CRÍTICO): Si el cliente pide precio de un "Samsung J7" o "Motorola G", NO le des un precio al azar. Pregúntale exactamente qué versión es.
-    4. EQUIPOS MOJADOS: Si se cayó al agua, NO des precio. Dile que apague el equipo y lo traiga urgente.
-    5. MANEJO DE OBJECIONES: Si el cliente dice que "es muy caro", recuérdale que usan repuestos originales con garantía y trabajo en el día.
-    6. EL CIERRE DIRECTO: Siempre termina con una pregunta para cerrar la venta.
-    7. SECRETO COMERCIAL EXTREMO: Tienes ESTRICTAMENTE PROHIBIDO revelar el costo base de los repuestos o los porcentajes de recargo. Solo das el precio final.
+    1. CERO EMOJIS Y CERO FORMATO: Tienes estrictamente prohibido usar emojis. No uses negritas (*texto*) ni listas. Escribe en texto plano.
+    2. DIALECTO ARGENTINO PROFESIONAL: Usa el voseo ("vos", "tenés"), pero mantén un tono completamente neutral y serio.
+    3. FRACCIONAMIENTO DE MENSAJES: Cuando des una respuesta con dos ideas distintas (ej: confirmar stock y luego decir el precio), separa ambas ideas estrictamente con un doble salto de línea (Enter, Enter).
+    4. NUNCA INVENTES PRECIOS: Usa la herramienta 'buscar_costo_repuesto_real'.
+    5. MANEJO DE AMBIGÜEDAD: Si el cliente pide precio de un "Samsung J7", NO le des un precio al azar. Pregúntale exactamente qué versión es.
+    6. EQUIPOS MOJADOS: Si se cayó al agua, NO des precio. Dile que apague el equipo y lo traiga urgente.
+    7. SECRETO COMERCIAL EXTREMO: Tienes ESTRICTAMENTE PROHIBIDO revelar el costo base de los repuestos.
     
-    FORMATO DE COTIZACIÓN (Obligatorio al pasar precio):
-    "Mirá, dejar a nuevo la pantalla de tu *[Modelo]* te quedaría en:
+    FORMATO DE COTIZACIÓN OBLIGATORIO (Usá doble enter):
+    Mirá, dejar a nuevo la pantalla de tu modelo te quedaría en:
     
-    💵 *$[Efectivo]* (Contado efectivo)
-    💳 *$[Lista]* (Transferencia o débito)
-    💳 *$[Tarjeta]* en 3 cuotas fijas de *$[Valor Cuota]*
+    Efectivo: $[Efectivo]
+    Transferencia: $[Lista]
+    Tarjeta: 3 cuotas de $[Valor Cuota]
     
-    Y recordá que si reservás turno ahora, te lo hacemos en *1 HORA* y mientras esperás te invitamos un café en Bonafide ☕"
+    Y recordá que si reservás turno ahora, te lo hacemos en 1 HORA.
     """
 
 def compilar_cerebro(client_id: str):
@@ -130,11 +115,6 @@ def procesar_mensaje_whatsapp(mensaje_usuario: str, numero_cliente: str, agente)
             config={"configurable": {"thread_id": numero_cliente}}
         )
         texto_final = respuesta_cruda["messages"][-1].content
-        
-        # 3. BLINDAJE DE VELOCIDAD HUMANA
-        tiempo_tipeo = random.uniform(2.5, 4.5) 
-        print(f"⏱️ Simulando tipeo humano durante {tiempo_tipeo:.1f} segundos...")
-        time.sleep(tiempo_tipeo) 
         
         return texto_final
 
