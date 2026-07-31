@@ -73,7 +73,7 @@ def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_
     print(f"🧠 La IA está pensando la respuesta para {sender_id}...")
     
     try:
-        agente = compilar_cerebro()
+        agente = compilar_cerebro(sender_id)
         instrucciones = obtener_instrucciones_seguras()
         
         historial = [
