@@ -81,8 +81,9 @@ def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_
             HumanMessage(content=texto_cliente)
         ]
         
-        # Ejecutamos el agente de LangGraph
-        resultado = agente.invoke({"messages": historial})
+        # ✅ La forma correcta para que LangGraph use su memoria
+        config_memoria = {"configurable": {"thread_id": str(sender_id)}}
+        resultado = agente.invoke({"messages": historial}, config=config_memoria)
         respuesta_final = resultado["messages"][-1].content
         
         # Le enviamos la respuesta a Chatwoot en lugar de a Meta
