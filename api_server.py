@@ -111,7 +111,8 @@ async def recibir_mensaje_chatwoot(request: Request, background_tasks: Backgroun
                 print(f"\n📩 [Chatwoot Webhook] Mensaje de {sender_id}: {texto_cliente}")
                 
                 # Despachamos la tarea en segundo plano para no bloquear a Chatwoot
-                background_tasks.add_task(procesar_y_responder_fondo, texto_cliente, sender_id, conversation_id)
+                ## background_tasks.add_task(procesar_y_responder_fondo, texto_cliente, sender_id, conversation_id)
+                procesar_y_responder_fondo(texto_cliente, sender_id, conversation_id)
                 
         return {"status": "ok"}
         
