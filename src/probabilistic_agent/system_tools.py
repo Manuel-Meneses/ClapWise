@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 from supabase import create_client
 from langchain_core.tools import tool
+import requests as req
 
 load_dotenv()
 supabase = create_client(os.environ.get("SUPABASE_URL"), os.environ.get("SUPABASE_KEY"))
@@ -30,9 +31,39 @@ def generar_link_pago(client_id: str, monto: float, descripcion_producto: str) -
 
 @tool
 def solicitar_asistencia_humana(client_id: str, numero_cliente: str, motivo: str) -> str:
-    """Alerta a humano."""
-    return "Notificación enviada a un asesor."
-
+    """Usa esta herramienta para alertar a un humano (Joa). En el campo 'motivo', debes escribir el resumen detallado de la encuesta o problema del cliente."""
+    
+    print(f"🚨 ALERTANDO A JOA: El cliente {numero_cliente} necesita ayuda. Resumen del bot: {motivo}")
+    
+    # Los mismos datos de Meta que usamos en tu api_server.py
+    TOKEN = "EAATkL1hn6uEBSMlVD9wREiuZCZAiWmJj1GIqvSGLMZAk6IS1YsvWHgXGkTs7km75wbMSiLLXfRCBiTrBWcOWZB4RJFZAo16KXwtN7cGOJCkCPNDrfwJRbr8awTkhKVH3bhr0KFUuy4NMh9muWNY0yHIzwANScFxPV1yCZC9g6fcZBvpKnKT10rQmuF9R8x26SphigZDZD"
+    PHONE_ID = "1271041542753450" 
+    
+    # 👇 ACÁ PONÉS EL CELULAR PERSONAL DE JOA (Con código de país, ej: 549351XXXXXXX)
+    NUMERO_DE_JOA = "5493510000000" 
+    
+    url = f"https://graph.facebook.com/v19.0/{PHONE_ID}/messages"
+    
+    headers = {
+        "Authorization": f"Bearer {TOKEN}",
+        "Content-Type": "application/json"
+    }
+    
+    # Armamos el mensaje que le va a llegar al celular de Joa
+    mensaje_para_joa = f"⚠️ *NUEVO CLIENTE DERIVADO* ⚠️\n\nEl bot acaba de pausarse para este número:\n📞 *{numero_cliente}*\n\n*📋 Resumen de la encuesta (Hecho por la IA):*\n{motivo}\n\nYa podés entrar a la bandeja de entrada para contestarle el presupuesto."
+    
+    data = {
+        "messaging_product": "whatsapp",
+        "to": NUMERO_DE_JOA,
+        "type": "text",
+        "text": {"body": mensaje_para_joa}
+    }
+    
+    # Disparamos el mensaje a Joa
+    req.post(url, headers=headers, json=data)
+    
+    # Le devolvemos este texto al bot para que sepa que hizo bien su trabajo
+    return "Notificación enviada exitosamente a Joa con el resumen del diagnóstico. Ya puedes despedirte del cliente."
 
 @tool
 def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
@@ -44,9 +75,7 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
     # 🧠 ORDEN DE PRIORIDAD: El bot va a buscar en este orden exacto.
     # Podés cambiar el orden moviendo los nombres de lugar.
     PRIORIDAD_PROVEEDORES = [
-        "proveedor_i2c", 
-        "proveedor_syphon", 
-        "proveedor_sintren"
+        "proveedor_one_services",
     ]
 
     try:
