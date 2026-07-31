@@ -38,7 +38,7 @@ CHATWOOT_URL = "https://chatwoot-production-eaad.up.railway.app"
 ACCOUNT_ID = "1" 
 
 # 👇 Reemplazá esto por el "Token de Acceso" de los Ajustes de Perfil
-API_TOKEN = "zioujKf9UvXiDYbjmyTwBt4V" 
+API_TOKEN = "kCxB6tsn2E4qyf6P53EfSvqg" 
 
 # ========================================================
 # 🚀 FUNCIÓN DE ENVÍO (De Render hacia Chatwoot)
