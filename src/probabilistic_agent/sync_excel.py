@@ -12,7 +12,7 @@ supabase: Client = create_client(
 )
 
 # ⚠️ ACÁ VAN TUS DOS LINKS PUBLICADOS (.CSV)
-URL_CSV_MATRIZ = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQVs9TGz9Er9UT26VQz8zLZv_uWyZRER2ZhEi8lsbCH2h7BaSjCYQMtRt7gYFi5X2Gfz76oEVYr6Jed/pub?gid=0&single=true&output=csv"
+URL_CSV_MATRIZ = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQVs9TGz9Er9UT26VQz8zLZv_uWyZRER2ZhEi8lsbCH2h7BaSjCYQMtRt7gYFi5X2Gfz76oEVYr6Jed/pub?gid=1157405509&single=true&output=csv"
 URL_CSV_INFO = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQVs9TGz9Er9UT26VQz8zLZv_uWyZRER2ZhEi8lsbCH2h7BaSjCYQMtRt7gYFi5X2Gfz76oEVYr6Jed/pub?gid=1169996528&single=true&output=csv"
 
 def sincronizar_calculadora():
