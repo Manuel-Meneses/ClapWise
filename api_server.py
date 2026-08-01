@@ -39,12 +39,10 @@ app = FastAPI(lifespan=lifespan)
 # ========================================================
 CHATWOOT_URL = "https://chatwoot-production-eaad.up.railway.app"
 ACCOUNT_ID = "1" 
-
-# 👇 Reemplazá esto por el "Token de Acceso" de los Ajustes de Perfil
 API_TOKEN = "kCxB6tsn2E4qyf6P53EfSvqg" 
 
 # ========================================================
-# 🚀 FUNCIÓN DE ENVÍO (De Render hacia Chatwoot)
+# 🚀 FUNCIONES DE ENVÍO Y CONTROL HACIA CHATWOOT
 # ========================================================
 def enviar_mensaje_chatwoot(conversation_id: str, texto_respuesta: str):
     url = f"{CHATWOOT_URL}/api/v1/accounts/{ACCOUNT_ID}/conversations/{conversation_id}/messages"
@@ -69,6 +67,28 @@ def enviar_mensaje_chatwoot(conversation_id: str, texto_respuesta: str):
     except Exception as e:
         print(f"🚨 Excepción enviando a Chatwoot: {e}")
 
+# 👇 NUEVA FUNCIÓN: Cambia el estado de la charla para notificar a Joa
+def cambiar_estado_chatwoot(conversation_id: str, status: str = "open"):
+    url = f"{CHATWOOT_URL}/api/v1/accounts/{ACCOUNT_ID}/conversations/{conversation_id}/toggle_status"
+    
+    headers = {
+        "api_access_token": API_TOKEN,
+        "Content-Type": "application/json"
+    }
+    
+    data = {
+        "status": status
+    }
+    
+    try:
+        respuesta = req.post(url, headers=headers, json=data)
+        if respuesta.status_code == 200:
+            print(f"🔔 ¡ASISTENCIA HUMANA ACTIVADA! Conversación {conversation_id} pasada a '{status}'.")
+        else:
+            print(f"❌ Error cambiando estado en Chatwoot: {respuesta.text}")
+    except Exception as e:
+        print(f"🚨 Excepción cambiando estado en Chatwoot: {e}")
+
 # ========================================================
 # 🧠 TAREA DE FONDO (Procesa con Gemini y responde)
 # ========================================================
@@ -84,15 +104,12 @@ def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_
             HumanMessage(content=texto_cliente)
         ]
         
-        # ✅ La forma correcta para que LangGraph use su memoria
         config_memoria = {"configurable": {"thread_id": str(sender_id)}}
         resultado = agente.invoke({"messages": historial}, config=config_memoria)
         
-        # 👇 NUEVO DESEMPAQUETADOR INTELIGENTE
         contenido = resultado["messages"][-1].content
         
         if isinstance(contenido, list):
-            # Si Gemini nos manda una lista/paquete, extraemos solo el texto limpio
             textos = []
             for item in contenido:
                 if isinstance(item, dict) and "text" in item:
@@ -101,11 +118,23 @@ def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_
                     textos.append(item)
             respuesta_final = "".join(textos)
         else:
-            # Si ya es un texto limpio
             respuesta_final = str(contenido)
         
-        # Le enviamos la respuesta limpia a Chatwoot
-        enviar_mensaje_chatwoot(conversation_id, respuesta_final)
+        # 👇 NUEVA LÓGICA DE INTERCEPCIÓN (DERIVACIÓN A HUMANO)
+        if "[ASISTENCIA_HUMANA]" in respuesta_final:
+            print(f"⚠️ El Bot solicitó derivar la conversación {conversation_id} a un humano.")
+            
+            # 1. Limpiamos la etiqueta para que el cliente no vea códigos raros
+            respuesta_limpia = respuesta_final.replace("[ASISTENCIA_HUMANA]", "").strip()
+            
+            # 2. Le mandamos el mensaje final al cliente
+            enviar_mensaje_chatwoot(conversation_id, respuesta_limpia)
+            
+            # 3. Le pasamos la pelota a Joa abriendo la conversación en la bandeja
+            cambiar_estado_chatwoot(conversation_id, status="open")
+        else:
+            # Si no pide ayuda, responde y sigue normal
+            enviar_mensaje_chatwoot(conversation_id, respuesta_final)
         
     except Exception as e:
         import traceback
@@ -129,8 +158,7 @@ async def recibir_mensaje_chatwoot(request: Request, background_tasks: Backgroun
             if texto_cliente and conversation_id:
                 print(f"\n📩 [Chatwoot Webhook] Mensaje de {sender_id}: {texto_cliente}")
                 
-                # Despachamos la tarea en segundo plano para no bloquear a Chatwoot
-                ## background_tasks.add_task(procesar_y_responder_fondo, texto_cliente, sender_id, conversation_id)
+                # Despachamos la tarea (podés usar background_tasks si ves que Chatwoot hace timeout)
                 procesar_y_responder_fondo(texto_cliente, sender_id, conversation_id)
                 
         return {"status": "ok"}

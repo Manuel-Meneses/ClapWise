@@ -117,23 +117,40 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
                 
                 if filtro_adicional.replace('ó', 'o') in texto_bd_lower:
                     # Aplicamos validación láser de modelo para evitar mezclar G5 con G51
+                    # Aplicamos validación láser de modelo para evitar mezclar G5 con G51
                     nombre_limpio_sku = nombre_bd.replace('/', ' ').replace('-', ' ').replace('(', ' ').replace(')', ' ')
                     nombre_pad = f" {nombre_limpio_sku} "
                     
                     coincide_todo = True
                     for t in modelo.upper().split():
                         t_str = str(t).strip()
+                        
+                        # 🧠 TRUCO MENTAL: Generador de variantes (G5 <-> G05, A3 <-> A03)
+                        variantes_termino = [t_str]
+                        if len(t_str) == 2 and t_str[0].isalpha() and t_str[1].isdigit():
+                            variantes_termino.append(f"{t_str[0]}0{t_str[1]}") # Convierte G5 en G05
+                        elif len(t_str) == 3 and t_str[0].isalpha() and t_str[1] == '0' and t_str[2].isdigit():
+                            variantes_termino.append(f"{t_str[0]}{t_str[2]}") # Convierte G05 en G5
+                            
+                        # Si tiene números o es muy corto, exigimos palabra exacta con alguna variante
                         if any(char.isdigit() for char in t_str) or len(t_str) <= 2:
-                            if f" {t_str} " not in nombre_pad:
+                            encontrado = False
+                            for variante in variantes_termino:
+                                if f" {variante} " in nombre_pad:
+                                    encontrado = True
+                                    break # Si encuentra al menos una variante, lo da por válido
+                                    
+                            if not encontrado:
                                 coincide_todo = False
                                 break
                         else:
+                            # Si es puro texto (ej: MOTOROLA), busca normalmente
                             if t_str not in nombre_bd:
                                 coincide_todo = False
                                 break
                     
                     if coincide_todo:
-                        repuestos_filtrados.append(rep)
+                        repuestos_filtrados.append(rep) 
                     
             if not repuestos_filtrados: continue
                 
