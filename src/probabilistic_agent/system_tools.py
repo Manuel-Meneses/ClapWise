@@ -128,21 +128,51 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
                 - Tarjeta: ${tarjeta} (3 cuotas de ${cuota})
                 INSTRUCCIÓN IA: Arma tu respuesta final usando ESTOS NÚMEROS EXACTOS. No apliques ninguna suma o descuento adicional."""
             
-            # ¡HAY VARIAS CALIDADES!
             else:
-                opciones = ""
-                for r in repuestos_filtrados[:6]: 
-                    lista, efectivo, tarjeta, cuota = aplicar_calculadora(r['precio'])
-                    # Guardamos toda la cotización de cada calidad para que la IA elija cómo presentarla
-                    opciones += f"- {r['nombre_consolidado']} -> EFVO: ${efectivo} | LISTA: ${lista} | TARJETA: ${tarjeta} (3 de ${cuota})\n"
+                # 🧠 LÓGICA DE PRIORIDADES DE ONE SERVICES CORREGIDA
+                def calcular_prioridad(nombre):
+                    n = nombre.upper()
+                    
+                    # 1. Definimos el peso de la CALIDAD PRINCIPAL (más bajo es mejor)
+                    base = 6.0 # Por defecto, si no conocemos la marca, va al final
+                    
+                    if "OLED" in n:
+                        base = 1.0
+                    elif "ORIG" in n or "ORI" in n:
+                        base = 2.0
+                    elif "SUNLONG" in n or "JK" in n:
+                        base = 3.0
+                    elif "MARCO" in n or "C/MARCO" in n:
+                        base = 4.0
+                    elif "INCELL" in n:
+                        base = 5.0
+                        
+                    # 2. Definimos el modificador de CARACTERÍSTICA (Desempate)
+                    # Si la base es igual (ej: dos OLED), Soft resta puntos (lo hace mejor) y Hard suma (lo hace peor)
+                    modificador = 0.0
+                    if "SOFT" in n:
+                        modificador = -0.1
+                    elif "HARD" in n:
+                        modificador = 0.1
+                        
+                    # El resultado final es la mezcla perfecta sin que se pisen
+                    return base + modificador
                 
-                return f"""ATENCIÓN: Encontré VARIAS calidades distintas para '{modelo}'.
+                # Ordenamos la lista de repuestos usando tu regla de prioridades
+                repuestos_ordenados = sorted(repuestos_filtrados, key=lambda x: calcular_prioridad(x['nombre_consolidado']))
+                
+                # CORTAMOS LA LISTA: Solo le pasamos a Gemini las 2 mejores opciones
+                mejores_opciones = repuestos_ordenados[:2]
+                
+                opciones_texto = ""
+                for r in mejores_opciones: 
+                    lista, efectivo, tarjeta, cuota = aplicar_calculadora(r['precio'])
+                    opciones_texto += f"- {r['nombre_consolidado']} -> EFVO: ${efectivo} | LISTA: ${lista} | TARJETA: ${tarjeta} (3 de ${cuota})\n"
+                
+                return f"""ATENCIÓN: Encontré varias calidades, pero ya seleccioné las {len(mejores_opciones)} MEJORES para ofrecerle al cliente.
                 Acá tenés los precios FINALES para cada versión:
-                {opciones}
-                INSTRUCCIÓN IA: Preguntale al cliente qué modelo/versión exacta tiene, o presentale la opción Original vs. Básica usando los precios de EFECTIVO de esta lista para que elija."""
-
-        return f"Revisé todos nuestros catálogos y ninguno tiene stock del repuesto '{tipo_repuesto}' para '{modelo}'. Informale esto al cliente."
-
+                {opciones_texto}
+                INSTRUCCIÓN IA: Ofrece ESTAS opciones al cliente aplicando tus reglas comerciales de calidades."""
     except Exception as e:
         import traceback
         print(f"🚨 [ERROR]:\n{traceback.format_exc()}")

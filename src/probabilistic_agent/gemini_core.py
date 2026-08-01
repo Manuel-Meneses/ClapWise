@@ -32,31 +32,20 @@ def obtener_instrucciones_seguras(client_id: str) -> str:
     # Recuperamos las reglas de la base de datos de forma segura
     try:
         respuesta = supabase.table("configuracion_clientes").select("reglas_calculadora").eq("client_id", client_id).execute()
-        reglas_calculadora = respuesta.data[0]["reglas_calculadora"] if respuesta.data else ""
+        contexto_negocio = respuesta.data[0]["reglas_calculadora"] if respuesta.data else ""
     except Exception as e:
-        print(f"❌ Error al cargar calculadora: {e}") 
-        reglas_calculadora = ""
+        print(f"❌ Error al cargar contexto de BD: {e}") 
+        contexto_negocio = ""
 
-    contexto_negocio = ""
-    if client_id == "3g_servicio":
-        contexto_negocio = f"""
-        INFORMACIÓN ESTÁTICA DEL LOCAL (3G Servicio Técnico Oficial):
-        - UBICACIÓN: Córdoba Capital, La Rioja 126. 
-        - GANCHO COMERCIAL: Reparaciones en 1 HORA. Invitamos café en Bonafide a quienes sacan turno.
-        - HORARIO: Lunes a Viernes de 9 a 18hs. Sábados de 9 a 13hs.
-        
-        REGLAS DE PRECIOS DEL SISTEMA:
-        {reglas_calculadora}
-        """
-
-    # 👇 Lógica de reglas dinámicas según el proveedor
+    # 👇 Lógica de reglas dinámicas según el proveedor (ESTO QUEDA IGUAL)
     reglas_calidad_especificas = ""
-    if client_id == "proveedor_one_services" or client_id == "3g_servicio": # Aplicamos a One Services (o tu local si usa este catálogo)
-        reglas_calidad_especificas = """
-    3. TRADUCCIÓN DE CALIDADES (ONE SERVICES): Agrupa los repuestos de este proveedor en 3 categorías comerciales para ofrecérselas al cliente de mayor a menor calidad:
-       - PRIMERA OPCIÓN: Todo lo que diga OLED, ORIGINAL, PREMIUM, ORIG, SOFT OLED o HARD OLED. Preséntalo como "Calidad Original / Primera calidad".
-       - SEGUNDA OPCIÓN: Lo que diga SUNLONG o JK. Preséntalo como "Alternativa excelente, casi al mismo nivel que la original".
-       - TERCERA OPCIÓN: Lo que diga INCELL. Preséntalo como "Calidad básica, ideal si buscás algo más económico para zafar".
+    if client_id == "proveedor_one_services" or client_id == "3g_servicio":
+      reglas_calidad_especificas = """
+    3. TRADUCCIÓN DE CALIDADES (ONE SERVICES): El sistema te entregará un máximo de DOS opciones de repuestos. Usa este speech exacto según lo que recibas:
+       - Si el repuesto dice OLED, SOFT, HARD u ORIGINAL: Vendelo como "Primera calidad" (Para nosotros, todo esto es OLED y es lo mejor).
+       - Si el repuesto dice SUNLONG o JK: Vendelo como "Una alternativa de calidad superior, incluso mejor que la original".
+       - Si el repuesto dice MARCO o C/MARCO: Menciónalo como un beneficio extra ("viene con el marco incluido, así que el equipo queda estructuralmente como de fábrica").
+       - Si el repuesto dice INCELL: Tienes la OBLIGACIÓN ESTRICTA de advertirle al cliente: "Es una calidad muy básica, te la recomiendo solo si necesitás salir del apuro o para zafar, pero tené en cuenta que no es tan segura".
        """
     else:
         reglas_calidad_especificas = """
@@ -83,6 +72,7 @@ def obtener_instrucciones_seguras(client_id: str) -> str:
     4. PREGUNTA EL MODELO EXACTO: Si el cliente pide un "Samsung A05" pero la base trae A05 y A05s, pregúntale: "Veo que hay un par de versiones, ¿el tuyo es el A05 normal o el A05s?".
     5. NUNCA INVENTES PRECIOS: Usa la herramienta 'buscar_costo_repuesto_real'. SECRETO COMERCIAL: Tienes ESTRICTAMENTE PROHIBIDO revelar nuestro costo base interno.
     6. EQUIPOS MOJADOS: Si el equipo se mojó, dile que lo apague urgente y lo traiga. No des presupuestos al aire.
+    7. EL FACTOR COLOR: SOLO SI en las opciones que te pasa el sistema ves que aclara colores específicos (ej: "Módulo Blanco", "Módulo Negro"), agregá al final de tu mensaje: "Veo que viene en distintos colores, ¿de qué color es tu equipo?". Si los repuestos que te pasa el sistema NO mencionan ningún color, TIENES ESTRICTAMENTE PROHIBIDO preguntar por el color.
     
     PROTOCOLO IPHONE (ESTRICTO Y OBLIGATORIO):
     Si piden arreglar CUALQUIER modelo de iPhone (Apple), TIENES PROHIBIDO dar precios. Sigue estos pasos:

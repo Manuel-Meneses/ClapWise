@@ -82,11 +82,18 @@ def sincronizar_one_services():
                 marca = str(item.get('marca', '')).strip().upper()
                 producto = str(item.get('producto', '')).strip().upper()
                 
+                # Descartamos iPhone para este proveedor
                 if "IPHONE" in marca or "IPHONE" in producto:
                     continue
                 
-                if any(basura in producto for basura in ["MECANICO", "OLED SMALL", "HD +", "FHD"]):
+                # 🚫 FILTRO ESTRICTO DE BASURA: 
+                # Le agregamos espacios a " HD " para que no corte palabras que tengan "hd" por casualidad
+                producto_con_espacios = f" {producto} "
+                if any(basura in producto_con_espacios for basura in [" MECANICO ", " OLED SMALL ", " HD ", " HD+ ", " FHD "]):
                     continue
+                
+                # Para la base de datos, guardamos el nombre limpio, las prioridades las calculará el bot en vivo
+                nombre_completo = f"{categoria} {marca} {producto}"
                 
                 calidad_tag = ""
                 if "SOFT" in producto:
