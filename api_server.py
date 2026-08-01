@@ -84,9 +84,24 @@ def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_
         # ✅ La forma correcta para que LangGraph use su memoria
         config_memoria = {"configurable": {"thread_id": str(sender_id)}}
         resultado = agente.invoke({"messages": historial}, config=config_memoria)
-        respuesta_final = resultado["messages"][-1].content
         
-        # Le enviamos la respuesta a Chatwoot en lugar de a Meta
+        # 👇 NUEVO DESEMPAQUETADOR INTELIGENTE
+        contenido = resultado["messages"][-1].content
+        
+        if isinstance(contenido, list):
+            # Si Gemini nos manda una lista/paquete, extraemos solo el texto limpio
+            textos = []
+            for item in contenido:
+                if isinstance(item, dict) and "text" in item:
+                    textos.append(item["text"])
+                elif isinstance(item, str):
+                    textos.append(item)
+            respuesta_final = "".join(textos)
+        else:
+            # Si ya es un texto limpio
+            respuesta_final = str(contenido)
+        
+        # Le enviamos la respuesta limpia a Chatwoot
         enviar_mensaje_chatwoot(conversation_id, respuesta_final)
         
     except Exception as e:
