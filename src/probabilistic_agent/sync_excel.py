@@ -1,4 +1,5 @@
 import os
+import json
 import pandas as pd
 from dotenv import load_dotenv
 from supabase import create_client, Client
@@ -10,54 +11,64 @@ supabase: Client = create_client(
     os.environ.get("SUPABASE_KEY")
 )
 
-URL_SHEET = "https://docs.google.com/spreadsheets/d/1NhJ69KAOtLl1hD8FxQh4umQbO8uTUySiz2EZI3-XFUE/export?format=xlsx"
+# ⚠️ ACÁ PEGÁS EL LINK .CSV QUE TE DA GOOGLE SHEETS AL PUBLICAR LA HOJA
+URL_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQVs9TGz9Er9UT26VQz8zLZv_uWyZRER2ZhEi8lsbCH2h7BaSjCYQMtRt7gYFi5X2Gfz76oEVYr6Jed/pub?gid=0&single=true&output=csv"
 
 def sincronizar_calculadora():
-    print("📥 Leyendo la lógica financiera desde Google Sheets...")
+    print("📥 Descargando la matriz matemática desde Google Sheets...")
     
     try:
-        df = pd.read_excel(URL_SHEET, sheet_name="Calculadora precios service")
+        # Leemos el CSV desde la web
+        df = pd.read_csv(URL_CSV)
         
-        # 1. Extraemos forzando a que sean números reales (evita que un error de tipeo rompa el bot)
-        mano_obra_baja = int(pd.to_numeric(df.iloc[5, 1], errors='coerce') or 0)
-        mano_obra_media = int(pd.to_numeric(df.iloc[14, 1], errors='coerce') or 0)
-        mano_obra_alta = int(pd.to_numeric(df.iloc[23, 1], errors='coerce') or 0)
+        matriz_precios = []
         
-        # 2. Limpieza de porcentajes (Cubre si Joa pone '16', '16%' o '0.16')
-        val_efectivo = str(df.iloc[7, 2]).replace('%', '').strip()
-        val_tarjeta = str(df.iloc[8, 2]).replace('%', '').strip()
-        
-        desc_float = float(val_efectivo)
-        porcentaje_efectivo = int(desc_float * 100) if desc_float < 1 else int(desc_float)
-            
-        recargo_float = float(val_tarjeta)
-        porcentaje_tarjeta = int(recargo_float * 100) if recargo_float < 1 else int(recargo_float)
-
-        reglas_dinamicas = f"""
-        REGLAS PARA COTIZAR REPARACIONES (LA CALCULADORA INTERNA ACTUALIZADA):
-        
-        Paso A) Calcula el Precio de Lista MENTALMENTE (Costo repuesto + Mano de Obra):
-        - Si el repuesto cuesta hasta $38.000, suma ${mano_obra_baja}.
-        - Si el repuesto cuesta entre $39.000 y $45.000, suma ${mano_obra_media}.
-        - Si el repuesto cuesta más de $45.000, suma ${mano_obra_alta}.
-
-        Paso B) Calcula los 3 precios finales para el cliente a partir del Precio de Lista:
-        1. Precio de Lista (Transferencia/Débito): Resultado exacto del Paso A.
-        2. Precio Efectivo: Quítale un {porcentaje_efectivo}% al Precio de Lista.
-        3. Precio Tarjeta (3 Cuotas): Súmale un {porcentaje_tarjeta}% al Precio de Lista (y divide en 3 para la cuota).
-        """
-        
-        data = {
-            "client_id": "3g_servicio",
-            "reglas_calculadora": reglas_dinamicas
+        # Recorremos fila por fila para armar el cerebro matemático
+        for index, row in df.iterrows():
+            try:
+                # Nos aseguramos de limpiar signos $, % y comas por si Joa los tipea
+                min_cost = float(str(row.iloc[0]).replace('$', '').replace('.', '').replace(',', '').strip())
+                mo = float(str(row.iloc[1]).replace('$', '').replace('.', '').replace(',', '').strip())
+                
+                dto_str = str(row.iloc[2]).replace('%', '').replace(',', '.').strip()
+                rec_str = str(row.iloc[3]).replace('%', '').replace(',', '.').strip()
+                
+                dto = float(dto_str)
+                rec = float(rec_str)
+                
+                # Si el excel dice "16" en vez de "0.16", lo dividimos por 100
+                if dto > 1: dto = dto / 100
+                if rec > 1: rec = rec / 100
+                
+                matriz_precios.append({
+                    "min": min_cost,
+                    "mo": mo,
+                    "dto": dto,
+                    "rec": rec
+                })
+            except Exception as e:
+                # Si hay una fila vacía o un texto raro, la ignora y sigue
+                continue 
+                
+        # Guardamos la matriz como un JSON en Supabase (bajo un cliente falso para que sea fácil de leer)
+        data_matriz = {
+            "client_id": "matriz_calculo_interna",
+            "reglas_calculadora": json.dumps(matriz_precios)
         }
         
-        supabase.table("configuracion_clientes").upsert(data).execute()
-        print("🚀 Sincronización completa. El cerebro financiero de Joa está en la nube.\n")
+        # También le aclaramos a la IA de 3G Servicio que ya no tiene que hacer cálculos
+        data_ia = {
+            "client_id": "3g_servicio",
+            "reglas_calculadora": "REGLA FINANCIERA: Los precios que te entregue el sistema ya son los FINALES. NO le sumes mano de obra ni apliques descuentos, entrégalos exactamente como el sistema te los arroja."
+        }
+        
+        supabase.table("configuracion_clientes").upsert(data_matriz).execute()
+        supabase.table("configuracion_clientes").upsert(data_ia).execute()
+        
+        print("🚀 ¡Sincronización completa! La matriz de Joa está inyectada en la base de datos.\n")
         
     except Exception as e:
-        print(f"🚨 Error crítico al sincronizar la calculadora de Joa: {e}")
-        print("⚠️ Avisale a Joa que no modifique la estructura de las filas en el Excel.")
+        print(f"🚨 Error crítico al sincronizar la calculadora: {e}")
 
 if __name__ == "__main__":
     sincronizar_calculadora()
