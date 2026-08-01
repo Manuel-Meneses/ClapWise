@@ -97,7 +97,7 @@ def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_
     
     try:
         agente = compilar_cerebro(sender_id)
-        instrucciones = obtener_instrucciones_seguras(sender_id)
+        instrucciones = obtener_instrucciones_seguras("3g_servicio")
         
         historial = [
             SystemMessage(content=instrucciones),
