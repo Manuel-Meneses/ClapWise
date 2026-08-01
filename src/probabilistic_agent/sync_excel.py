@@ -20,19 +20,34 @@ def sincronizar_calculadora():
     print("📥 Descargando datos desde Google Sheets...")
     
     try:
-        # ==========================================
+# ==========================================
         # 1. DESCARGAMOS LA MATRIZ MATEMÁTICA
         # ==========================================
+        
+        # Función antibalas para limpiar formatos de pesos argentinos
+        def limpiar_dinero(valor):
+            v = str(valor).replace('$', '').strip()
+            # Si el excel le agregó centavos (,00 o .00), se los amputamos
+            if v.endswith(',00'): v = v[:-3]
+            if v.endswith('.00'): v = v[:-3]
+            # Ahora sí, matamos puntos y comas de miles sin riesgo
+            v = v.replace('.', '').replace(',', '')
+            return float(v) if v else 0.0
+
         df_matriz = pd.read_csv(URL_CSV_MATRIZ)
         matriz_precios = []
+        
         for index, row in df_matriz.iterrows():
             try:
-                min_cost = float(str(row.iloc[0]).replace('$', '').replace('.', '').replace(',', '').strip())
-                mo = float(str(row.iloc[1]).replace('$', '').replace('.', '').replace(',', '').strip())
+                min_cost = limpiar_dinero(row.iloc[0])
+                mo = limpiar_dinero(row.iloc[1])
+                
                 dto = float(str(row.iloc[2]).replace('%', '').replace(',', '.').strip())
                 rec = float(str(row.iloc[3]).replace('%', '').replace(',', '.').strip())
+                
                 if dto > 1: dto = dto / 100
                 if rec > 1: rec = rec / 100
+                
                 matriz_precios.append({"min": min_cost, "mo": mo, "dto": dto, "rec": rec})
             except: continue 
                 
