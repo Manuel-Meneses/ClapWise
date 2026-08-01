@@ -21,9 +21,10 @@ async def lifespan(app: FastAPI):
     scheduler = BackgroundScheduler()
     print("🔄 Forzando sincronización inicial al encender el servidor...")
     sincronizar_calculadora()
+    sincronizar_one_services()
     
     # Mantenemos solo a One Services y la Calculadora
-    scheduler.add_job(sincronizar_one_services, 'interval', hours=24)
+    scheduler.add_job(sincronizar_one_services, 'interval', hours=6)
     scheduler.add_job(sincronizar_calculadora, 'interval', hours=12) 
     
     scheduler.start()

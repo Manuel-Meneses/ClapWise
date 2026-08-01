@@ -29,7 +29,7 @@ memoria_global = MemorySaver()
 prompts_por_agente = {}
 
 def obtener_instrucciones_seguras(client_id: str) -> str:
-    # Recuperamos las reglas de la base de datos de forma segura
+# 1. Recuperamos TODO el contexto y reglas desde la base de datos (Info Estática y Calculadora)
     try:
         respuesta = supabase.table("configuracion_clientes").select("reglas_calculadora").eq("client_id", client_id).execute()
         contexto_negocio = respuesta.data[0]["reglas_calculadora"] if respuesta.data else ""
@@ -37,10 +37,10 @@ def obtener_instrucciones_seguras(client_id: str) -> str:
         print(f"❌ Error al cargar contexto de BD: {e}") 
         contexto_negocio = ""
 
-    # 👇 Lógica de reglas dinámicas según el proveedor (ESTO QUEDA IGUAL)
+    # 2. Reglas de Calidades Específicas
     reglas_calidad_especificas = ""
     if client_id == "proveedor_one_services" or client_id == "3g_servicio":
-      reglas_calidad_especificas = """
+        reglas_calidad_especificas = """
     3. TRADUCCIÓN DE CALIDADES (ONE SERVICES): El sistema te entregará un máximo de DOS opciones de repuestos. Usa este speech exacto según lo que recibas:
        - Si el repuesto dice OLED, SOFT, HARD u ORIGINAL: Vendelo como "Primera calidad" (Para nosotros, todo esto es OLED y es lo mejor).
        - Si el repuesto dice SUNLONG o JK: Vendelo como "Una alternativa de calidad superior, incluso mejor que la original".
@@ -51,6 +51,14 @@ def obtener_instrucciones_seguras(client_id: str) -> str:
         reglas_calidad_especificas = """
     3. TRADUCCIÓN DE CALIDADES: Intenta ofrecerle al cliente la mejor calidad disponible como 'Calidad Original', y si hay una opción notoriamente más barata, ofrécela como 'Alternativa económica'.
        """
+
+    # 3. Reglas de Personalidad Antirrobóticas y Manejo de Errores de Modelos
+    reglas_personalidad = """
+    REGLAS ESTRICTAS DE COMPORTAMIENTO HUMANO Y LOCAL:
+    - INFO DEL LOCAL: Lee detenidamente la "INFORMACIÓN ESTÁTICA DEL LOCAL" provista arriba para responder sobre horarios, ubicación y redes sociales. Está prohibido decir que esos datos no figuran en el sistema.
+    - MODELOS INVÁLIDOS O INCOMPLETOS: Si el cliente tira un modelo inexistente, confuso o muy genérico (ej: "un motorola", "moto g"), usa ESTA FRASE EXACTA: "Ese modelo no me figura exactamente". Indícale que verifique el modelo exacto ingresando en Configuración > Acerca del teléfono. PROHIBIDO mandar al cliente a mirar la parte de atrás del equipo.
+    - CERO RELLENO ROBÓTICO: Ve directo al grano. Está prohibido usar muletillas robóticas como "así puedo buscar el repuesto que le corresponde".
+    """
 
     return f"""
     Sos un empleado real de atención al público trabajando en el mostrador del local '{client_id}'.

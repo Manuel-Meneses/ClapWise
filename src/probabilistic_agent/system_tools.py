@@ -65,6 +65,7 @@ def solicitar_asistencia_humana(client_id: str, numero_cliente: str, motivo: str
     
     # Le devolvemos este texto al bot para que sepa que hizo bien su trabajo
     return "Notificación enviada exitosamente a Joa con el resumen del diagnóstico. Ya puedes despedirte del cliente."
+
 @tool
 def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
     """Busca repuestos, aplica la matriz de rentabilidad y devuelve los precios finales al cliente."""
@@ -98,7 +99,7 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
             cuota = tarjeta / 3
             return int(lista), int(efectivo), int(tarjeta), int(cuota)
 
-        # 2. Búsqueda de repuestos
+        # 2. Búsqueda de repuestos con PRECISIÓN LÁSER (Antifalso positivo, ej: G5 vs G51)
         modelo_limpio = modelo.replace("Samsung", "").replace("samsung", "").strip()
         if not modelo_limpio: modelo_limpio = modelo 
         
@@ -108,11 +109,31 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
             
             if not resultados: continue 
                 
+            # Filtro estricto por tipo de repuesto y palabras exactas en el modelo
             repuestos_filtrados = []
             for rep in resultados:
-                texto_bd = str(rep.get('nombre_consolidado', '')).lower().replace('ó', 'o')
-                if filtro_adicional.replace('ó', 'o') in texto_bd:
-                    repuestos_filtrados.append(rep)
+                nombre_bd = str(rep.get('nombre_consolidado', '')).upper()
+                texto_bd_lower = nombre_bd.lower().replace('ó', 'o')
+                
+                if filtro_adicional.replace('ó', 'o') in texto_bd_lower:
+                    # Aplicamos validación láser de modelo para evitar mezclar G5 con G51
+                    nombre_limpio_sku = nombre_bd.replace('/', ' ').replace('-', ' ').replace('(', ' ').replace(')', ' ')
+                    nombre_pad = f" {nombre_limpio_sku} "
+                    
+                    coincide_todo = True
+                    for t in modelo.upper().split():
+                        t_str = str(t).strip()
+                        if any(char.isdigit() for char in t_str) or len(t_str) <= 2:
+                            if f" {t_str} " not in nombre_pad:
+                                coincide_todo = False
+                                break
+                        else:
+                            if t_str not in nombre_bd:
+                                coincide_todo = False
+                                break
+                    
+                    if coincide_todo:
+                        repuestos_filtrados.append(rep)
                     
             if not repuestos_filtrados: continue
                 
@@ -132,30 +153,17 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
                 # 🧠 LÓGICA DE PRIORIDADES DE ONE SERVICES CORREGIDA
                 def calcular_prioridad(nombre):
                     n = nombre.upper()
-                    
-                    # 1. Definimos el peso de la CALIDAD PRINCIPAL (más bajo es mejor)
-                    base = 6.0 # Por defecto, si no conocemos la marca, va al final
-                    
-                    if "OLED" in n:
-                        base = 1.0
-                    elif "ORIG" in n or "ORI" in n:
-                        base = 2.0
-                    elif "SUNLONG" in n or "JK" in n:
-                        base = 3.0
-                    elif "MARCO" in n or "C/MARCO" in n:
-                        base = 4.0
-                    elif "INCELL" in n:
-                        base = 5.0
+                    base = 6.0 
+                    if "OLED" in n: base = 1.0
+                    elif "ORIG" in n or "ORI" in n: base = 2.0
+                    elif "SUNLONG" in n or "JK" in n: base = 3.0
+                    elif "MARCO" in n or "C/MARCO" in n: base = 4.0
+                    elif "INCELL" in n: base = 5.0
                         
-                    # 2. Definimos el modificador de CARACTERÍSTICA (Desempate)
-                    # Si la base es igual (ej: dos OLED), Soft resta puntos (lo hace mejor) y Hard suma (lo hace peor)
                     modificador = 0.0
-                    if "SOFT" in n:
-                        modificador = -0.1
-                    elif "HARD" in n:
-                        modificador = 0.1
+                    if "SOFT" in n: modificador = -0.1
+                    elif "HARD" in n: modificador = 0.1
                         
-                    # El resultado final es la mezcla perfecta sin que se pisen
                     return base + modificador
                 
                 # Ordenamos la lista de repuestos usando tu regla de prioridades
