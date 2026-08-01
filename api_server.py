@@ -19,6 +19,8 @@ from src.probabilistic_agent.gemini_core import compilar_cerebro, obtener_instru
 async def lifespan(app: FastAPI):
     print("⏰ Iniciando el reloj de automatización...")
     scheduler = BackgroundScheduler()
+    print("🔄 Forzando sincronización inicial al encender el servidor...")
+    sincronizar_calculadora()
     
     # Mantenemos solo a One Services y la Calculadora
     scheduler.add_job(sincronizar_one_services, 'interval', hours=24)
