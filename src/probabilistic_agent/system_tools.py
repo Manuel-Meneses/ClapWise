@@ -71,103 +71,107 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
     """Busca repuestos, aplica la matriz de rentabilidad y devuelve los precios finales al cliente."""
     print(f"\n🔍 [SISTEMA] Buscando: '{modelo}' | Repuesto: '{tipo_repuesto}'")
     
-    filtro_adicional = "módulo" if "pantalla" in tipo_repuesto.lower() else tipo_repuesto.lower()
+    # 1. 🧠 DICCIONARIO DE SINÓNIMOS PARA REPUESTOS (Soluciona Pin vs Conector)
+    tipo_rep = tipo_repuesto.lower().replace('ó', 'o').replace('í', 'i').replace('á', 'a').strip()
+    sinonimos_busqueda = [tipo_rep]
+    
+    if "pantalla" in tipo_rep or "modulo" in tipo_rep or "display" in tipo_rep:
+        sinonimos_busqueda = ["modulo", "pantalla", "display"]
+    elif "pin" in tipo_rep or "carga" in tipo_rep or "conector" in tipo_rep:
+        sinonimos_busqueda = ["pin", "conector", "placa", "flex de carga"]
+    elif "bateria" in tipo_rep or "pila" in tipo_rep:
+        sinonimos_busqueda = ["bateria", "bat"]
+    elif "tapa" in tipo_rep or "trasera" in tipo_rep:
+        sinonimos_busqueda = ["tapa", "vidrio trasero"]
+
     PRIORIDAD_PROVEEDORES = ["proveedor_one_services"]
 
     try:
-        # 1. Descargar la matriz de cálculo
+        # Descargar la matriz de cálculo
         respuesta_matriz = supabase.table("configuracion_clientes").select("reglas_calculadora").eq("client_id", "matriz_calculo_interna").execute()
         matriz_raw = respuesta_matriz.data[0]["reglas_calculadora"] if respuesta_matriz.data else "[]"
-        matriz = json.loads(matriz_raw)
-        
-        # Ordenamos de mayor a menor para que la lógica de rangos funcione perfecto
-        matriz = sorted(matriz, key=lambda x: x['min'], reverse=True)
+        matriz = sorted(json.loads(matriz_raw), key=lambda x: x['min'], reverse=True)
 
-        # Función interna para calcular los precios al vuelo
         def aplicar_calculadora(costo_base):
-            mo, dto, rec = 35000, 0.16, 0.25 # Valores por defecto de emergencia
+            mo, dto, rec = 35000, 0.16, 0.25
             for rango in matriz:
                 if costo_base >= rango['min']:
-                    mo = rango['mo']
-                    dto = rango['dto']
-                    rec = rango['rec']
+                    mo, dto, rec = rango['mo'], rango['dto'], rango['rec']
                     break
-            
             lista = costo_base + mo
             efectivo = lista * (1 - dto)
             tarjeta = lista * (1 + rec)
-            cuota = tarjeta / 3
-            return int(lista), int(efectivo), int(tarjeta), int(cuota)
+            return int(lista), int(efectivo), int(tarjeta), int(tarjeta / 3)
 
-        # 2. Búsqueda de repuestos con PRECISIÓN LÁSER (Antifalso positivo, ej: G5 vs G51)
-        modelo_limpio = modelo.replace("Samsung", "").replace("samsung", "").strip()
-        if not modelo_limpio: modelo_limpio = modelo 
+        # 2. 🧠 LIMPIEZA DE MARCAS (Soluciona que el proveedor no escriba "Moto")
+        marcas_a_ignorar = ["SAMSUNG", "MOTOROLA", "MOTO", "XIAOMI", "APPLE", "IPHONE", "LG", "NOKIA"]
+        modelo_limpio = modelo.upper()
+        for marca in marcas_a_ignorar:
+            modelo_limpio = modelo_limpio.replace(marca, "")
+        modelo_limpio = modelo_limpio.strip()
+        if not modelo_limpio: modelo_limpio = modelo.upper()
+            
+        # 3. 🧠 EXPANSIÓN DE BASE DE DATOS (Soluciona que Supabase esconda el G05)
+        variantes_db = [modelo_limpio]
+        for t in modelo_limpio.split():
+            if len(t) == 2 and t[0].isalpha() and t[1].isdigit():
+                variantes_db.append(f"{t[0]}0{t[1]}") # Agrega G05
+            elif len(t) == 3 and t[0].isalpha() and t[1] == '0' and t[2].isdigit():
+                variantes_db.append(f"{t[0]}{t[2]}") # Agrega G5
+                
+        # Le decimos a Supabase: Busca G5 "O" G05
+        filtro_or = ",".join([f"nombre_consolidado.ilike.%{v}%" for v in variantes_db if v])
         
         for proveedor in PRIORIDAD_PROVEEDORES:
-            respuesta = supabase.table("productos").select("*").eq("client_id", proveedor).ilike("nombre_consolidado", f"%{modelo_limpio}%").execute()
+            respuesta = supabase.table("productos").select("*").eq("client_id", proveedor).or_(filtro_or).execute()
             resultados = respuesta.data
             
             if not resultados: continue 
                 
-            # Filtro estricto por tipo de repuesto y palabras exactas en el modelo
             repuestos_filtrados = []
             for rep in resultados:
                 nombre_bd = str(rep.get('nombre_consolidado', '')).upper()
-                texto_bd_lower = nombre_bd.lower().replace('ó', 'o')
+                texto_bd_lower = nombre_bd.lower().replace('ó', 'o').replace('á', 'a').replace('í', 'i')
                 
-                if filtro_adicional.replace('ó', 'o') in texto_bd_lower:
-                    # Aplicamos validación láser de modelo para evitar mezclar G5 con G51
-                    # Aplicamos validación láser de modelo para evitar mezclar G5 con G51
+                # Chequeamos si alguno de los sinónimos (ej: "conector") está en el nombre
+                coincide_tipo = any(sin in texto_bd_lower for sin in sinonimos_busqueda)
+                
+                if coincide_tipo:
+                    # Aplicamos validación láser de modelo 
                     nombre_limpio_sku = nombre_bd.replace('/', ' ').replace('-', ' ').replace('(', ' ').replace(')', ' ')
                     nombre_pad = f" {nombre_limpio_sku} "
                     
                     coincide_todo = True
-                    for t in modelo.upper().split():
+                    for t in modelo_limpio.split():
                         t_str = str(t).strip()
                         
-                        # 🧠 TRUCO MENTAL: Generador de variantes (G5 <-> G05, A3 <-> A03)
                         variantes_termino = [t_str]
                         if len(t_str) == 2 and t_str[0].isalpha() and t_str[1].isdigit():
-                            variantes_termino.append(f"{t_str[0]}0{t_str[1]}") # Convierte G5 en G05
+                            variantes_termino.append(f"{t_str[0]}0{t_str[1]}") 
                         elif len(t_str) == 3 and t_str[0].isalpha() and t_str[1] == '0' and t_str[2].isdigit():
-                            variantes_termino.append(f"{t_str[0]}{t_str[2]}") # Convierte G05 en G5
+                            variantes_termino.append(f"{t_str[0]}{t_str[2]}") 
                             
-                        # Si tiene números o es muy corto, exigimos palabra exacta con alguna variante
-                        if any(char.isdigit() for char in t_str) or len(t_str) <= 2:
-                            encontrado = False
-                            for variante in variantes_termino:
-                                if f" {variante} " in nombre_pad:
-                                    encontrado = True
-                                    break # Si encuentra al menos una variante, lo da por válido
-                                    
-                            if not encontrado:
-                                coincide_todo = False
-                                break
-                        else:
-                            # Si es puro texto (ej: MOTOROLA), busca normalmente
-                            if t_str not in nombre_bd:
-                                coincide_todo = False
-                                break
+                        encontrado = False
+                        for variante in variantes_termino:
+                            if f" {variante} " in nombre_pad:
+                                encontrado = True
+                                break 
+                                
+                        if not encontrado:
+                            coincide_todo = False
+                            break
                     
                     if coincide_todo:
-                        repuestos_filtrados.append(rep) 
+                        repuestos_filtrados.append(rep)
                     
             if not repuestos_filtrados: continue
                 
-            # ¡BINGO! UN SOLO REPUESTO
             if len(repuestos_filtrados) == 1:
                 repuesto = repuestos_filtrados[0]
                 lista, efectivo, tarjeta, cuota = aplicar_calculadora(repuesto['precio'])
-                
-                return f"""ÉXITO. Encontré el repuesto: {repuesto['nombre_consolidado']}.
-                PRECIOS FINALES YA CALCULADOS PARA EL CLIENTE:
-                - Efectivo: ${efectivo}
-                - Transferencia (Lista): ${lista}
-                - Tarjeta: ${tarjeta} (3 cuotas de ${cuota})
-                INSTRUCCIÓN IA: Arma tu respuesta final usando ESTOS NÚMEROS EXACTOS. No apliques ninguna suma o descuento adicional."""
+                return f"ÉXITO. Encontré el repuesto: {repuesto['nombre_consolidado']}.\nPRECIOS FINALES:\n- Efectivo: ${efectivo}\n- Transferencia (Lista): ${lista}\n- Tarjeta: ${tarjeta} (3 cuotas de ${cuota})\nINSTRUCCIÓN IA: Arma tu respuesta final usando ESTOS NÚMEROS EXACTOS."
             
             else:
-                # 🧠 LÓGICA DE PRIORIDADES DE ONE SERVICES CORREGIDA
                 def calcular_prioridad(nombre):
                     n = nombre.upper()
                     base = 6.0 
@@ -176,17 +180,10 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
                     elif "SUNLONG" in n or "JK" in n: base = 3.0
                     elif "MARCO" in n or "C/MARCO" in n: base = 4.0
                     elif "INCELL" in n: base = 5.0
-                        
-                    modificador = 0.0
-                    if "SOFT" in n: modificador = -0.1
-                    elif "HARD" in n: modificador = 0.1
-                        
+                    modificador = -0.1 if "SOFT" in n else (0.1 if "HARD" in n else 0.0)
                     return base + modificador
                 
-                # Ordenamos la lista de repuestos usando tu regla de prioridades
                 repuestos_ordenados = sorted(repuestos_filtrados, key=lambda x: calcular_prioridad(x['nombre_consolidado']))
-                
-                # CORTAMOS LA LISTA: Solo le pasamos a Gemini las 2 mejores opciones
                 mejores_opciones = repuestos_ordenados[:2]
                 
                 opciones_texto = ""
@@ -194,11 +191,9 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
                     lista, efectivo, tarjeta, cuota = aplicar_calculadora(r['precio'])
                     opciones_texto += f"- {r['nombre_consolidado']} -> EFVO: ${efectivo} | LISTA: ${lista} | TARJETA: ${tarjeta} (3 de ${cuota})\n"
                 
-                return f"""ATENCIÓN: Encontré varias calidades, pero ya seleccioné las {len(mejores_opciones)} MEJORES para ofrecerle al cliente.
-                Acá tenés los precios FINALES para cada versión:
-                {opciones_texto}
-                INSTRUCCIÓN IA: Ofrece ESTAS opciones al cliente aplicando tus reglas comerciales de calidades."""
+                return f"ATENCIÓN: Encontré varias calidades. {len(mejores_opciones)} MEJORES:\n{opciones_texto}\nINSTRUCCIÓN IA: Ofrece ESTAS opciones al cliente."
+                
     except Exception as e:
         import traceback
         print(f"🚨 [ERROR]:\n{traceback.format_exc()}")
-        return "Error técnico al calcular repuesto. Pídele al cliente que espere un momento."
+        return "Error técnico al calcular repuesto."
