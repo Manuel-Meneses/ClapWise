@@ -158,9 +158,10 @@ async def recibir_mensaje_chatwoot(request: Request, background_tasks: Backgroun
             if texto_cliente and conversation_id:
                 print(f"\n📩 [Chatwoot Webhook] Mensaje de {sender_id}: {texto_cliente}")
                 
-                # Despachamos la tarea (podés usar background_tasks si ves que Chatwoot hace timeout)
-                procesar_y_responder_fondo(texto_cliente, sender_id, conversation_id)
+                # 🔥 LA MAGIA: Despachamos la tarea en segundo plano
+                background_tasks.add_task(procesar_y_responder_fondo, texto_cliente, sender_id, conversation_id)
                 
+        # Le respondemos "ok" a Chatwoot al instante para que no repita el mensaje
         return {"status": "ok"}
         
     except Exception as e:

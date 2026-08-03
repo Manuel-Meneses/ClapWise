@@ -169,7 +169,12 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
             if len(repuestos_filtrados) == 1:
                 repuesto = repuestos_filtrados[0]
                 lista, efectivo, tarjeta, cuota = aplicar_calculadora(repuesto['precio'])
-                return f"ÉXITO. Encontré el repuesto: {repuesto['nombre_consolidado']}.\nPRECIOS FINALES:\n- Efectivo: ${efectivo}\n- Transferencia (Lista): ${lista}\n- Tarjeta: ${tarjeta} (3 cuotas de ${cuota})\nINSTRUCCIÓN IA: Arma tu respuesta final usando ESTOS NÚMEROS EXACTOS."
+                return f"""ÉXITO. Encontré el repuesto: {repuesto['nombre_consolidado']}.
+                PRECIOS FINALES:
+                - Efectivo: ${efectivo}
+                - Transferencia (Lista): ${lista}
+                - Tarjeta: ${tarjeta} (3 cuotas de ${cuota})
+                INSTRUCCIÓN IA: Es un repuesto simple. Usa el formato de UNA SOLA OPCIÓN. PROHIBIDO mencionar calidad, premium, original o alternativas. Solo pasa los números."""
             
             else:
                 def calcular_prioridad(nombre):
@@ -184,15 +189,31 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
                     return base + modificador
                 
                 repuestos_ordenados = sorted(repuestos_filtrados, key=lambda x: calcular_prioridad(x['nombre_consolidado']))
-                mejores_opciones = repuestos_ordenados[:2]
+                
+                # 🧠 LÓGICA INTELIGENTE: 2 opciones para pantallas, 1 sola para el resto
+                es_pantalla = any(s in sinonimos_busqueda for s in ["modulo", "pantalla", "display"])
+                cantidad_opciones = 2 if es_pantalla else 1
+                
+                mejores_opciones = repuestos_ordenados[:cantidad_opciones]
                 
                 opciones_texto = ""
                 for r in mejores_opciones: 
                     lista, efectivo, tarjeta, cuota = aplicar_calculadora(r['precio'])
                     opciones_texto += f"- {r['nombre_consolidado']} -> EFVO: ${efectivo} | LISTA: ${lista} | TARJETA: ${tarjeta} (3 de ${cuota})\n"
                 
-                return f"ATENCIÓN: Encontré varias calidades. {len(mejores_opciones)} MEJORES:\n{opciones_texto}\nINSTRUCCIÓN IA: Ofrece ESTAS opciones al cliente."
+                # 👇 EL CANDADO DE CALIDADES
+                if es_pantalla:
+                    instruccion_final = "INSTRUCCIÓN IA: Es un módulo/pantalla. Usa el formato de DOS OPCIONES y aplica tus reglas de traducción de calidades (Premium, Alternativa)."
+                else:
+                    instruccion_final = "INSTRUCCIÓN IA: Es un repuesto simple (pin, batería, tapa). Usa el formato de UNA SOLA OPCIÓN. Tienes ESTRICTAMENTE PROHIBIDO mencionar palabras como 'calidad', 'premium', 'original' o 'alternativa'. Solo pasa el precio directo."
+
+                return f"ATENCIÓN: Encontré opciones. Te paso las {len(mejores_opciones)} MEJORES:\n{opciones_texto}\n{instruccion_final}"
                 
+        # 👇 4. RED DE SEGURIDAD (SIN STOCK) - Fuera del bucle for
+        return """ATENCIÓN: Búsqueda completada. 0 resultados en la base de datos.
+        INSTRUCCIÓN IA: Dile al cliente que lamentablemente no nos figura stock de ese repuesto en este momento, pero que le pasas la consulta a los chicos del taller para ver si se puede conseguir a pedido. 
+        OBLIGATORIO: Agrega al final de tu respuesta la etiqueta secreta: [ASISTENCIA_HUMANA]"""
+        
     except Exception as e:
         import traceback
         print(f"🚨 [ERROR]:\n{traceback.format_exc()}")
