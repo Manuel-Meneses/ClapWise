@@ -104,6 +104,7 @@ def obtener_instrucciones_seguras(client_id: str) -> str:
     Efectivo: $[Efectivo]
     Transferencia: $[Lista]
     Tarjeta: 3 cuotas de $[Valor Cuota]
+
     """
 
 def compilar_cerebro(client_id: str):
