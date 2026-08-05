@@ -4,7 +4,7 @@ from supabase import create_client
 from langchain_core.tools import tool
 import requests as req
 import json
-from sync_i2c import buscar_en_i2c
+from src.probabilistic_agent.sync_i2c import buscar_en_i2c
 
 load_dotenv()
 supabase = create_client(os.environ.get("SUPABASE_URL"), os.environ.get("SUPABASE_KEY"))
