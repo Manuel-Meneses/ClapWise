@@ -37,13 +37,14 @@ def obtener_instrucciones_seguras(client_id: str) -> str:
         print(f"❌ Error al cargar contexto de BD: {e}") 
         contexto_negocio = ""
 
-    # 2. Reglas de Calidades Específicas
+    # 2. Reglas de Calidades Específicas (FUSIONADAS PARA ONE SERVICES E I2C)
     reglas_calidad_especificas = ""
-    if client_id == "proveedor_one_services" or client_id == "3g_servicio":
+    if client_id in ["proveedor_one_services", "3g_servicio", "proveedor_i2c"]:
         reglas_calidad_especificas = """
-    3. TRADUCCIÓN DE CALIDADES (ONE SERVICES): El sistema te entregará un máximo de DOS opciones de repuestos. Usa este speech exacto según lo que recibas:
-       - Si el repuesto dice OLED, SOFT, HARD u ORIGINAL: Vendelo como "Primera calidad".
-       - Si el repuesto dice SUNLONG o JK: Vendelo como "Una alternativa de calidad superior".
+    3. TRADUCCIÓN DE CALIDADES: El sistema te entregará un máximo de DOS opciones de repuestos. Usa este speech exacto según lo que recibas:
+       - Si el repuesto dice SERVICE PACK: Vendelo como "Repuesto 100% Original de fábrica".
+       - Si el repuesto dice OLED, SOFT, HARD, ORIGINAL, o no aclara calidad: Vendelo como "Primera calidad".
+       - Si el repuesto dice SUNLONG, JK, CROWN o MS: Vendelo como "Una alternativa de calidad superior".
        - Si el repuesto dice MARCO o C/MARCO: Menciónalo como un beneficio extra ("viene con el marco incluido").
        - Si el repuesto dice INCELL: Tienes la OBLIGACIÓN ESTRICTA de advertir: "Es una calidad muy básica, te la recomiendo solo para salir del apuro".
        """
@@ -104,7 +105,6 @@ def obtener_instrucciones_seguras(client_id: str) -> str:
     Efectivo: $[Efectivo]
     Transferencia: $[Lista]
     Tarjeta: 3 cuotas de $[Valor Cuota]
-
     """
 
 def compilar_cerebro(client_id: str):

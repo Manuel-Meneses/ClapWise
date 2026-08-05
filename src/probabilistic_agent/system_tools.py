@@ -4,6 +4,7 @@ from supabase import create_client
 from langchain_core.tools import tool
 import requests as req
 import json
+from sync_i2c import buscar_en_i2c
 
 load_dotenv()
 supabase = create_client(os.environ.get("SUPABASE_URL"), os.environ.get("SUPABASE_KEY"))
@@ -75,14 +76,24 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
     tipo_rep = tipo_repuesto.lower().replace('ó', 'o').replace('í', 'i').replace('á', 'a').strip()
     sinonimos_busqueda = [tipo_rep]
     
+    # Variable estandarizada para pasarle a i2c después
+    tipo_repuesto_estandar = "pantalla" 
+    
     if "pantalla" in tipo_rep or "modulo" in tipo_rep or "display" in tipo_rep:
         sinonimos_busqueda = ["modulo", "pantalla", "display"]
+        tipo_repuesto_estandar = "pantalla"
     elif "pin" in tipo_rep or "carga" in tipo_rep or "conector" in tipo_rep:
         sinonimos_busqueda = ["pin", "conector", "placa", "flex de carga"]
+        tipo_repuesto_estandar = "placa_carga"
     elif "bateria" in tipo_rep or "pila" in tipo_rep:
         sinonimos_busqueda = ["bateria", "bat"]
+        tipo_repuesto_estandar = "bateria"
     elif "tapa" in tipo_rep or "trasera" in tipo_rep:
         sinonimos_busqueda = ["tapa", "vidrio trasero"]
+        tipo_repuesto_estandar = "tapa"
+    elif "camara" in tipo_rep or "lente" in tipo_rep:
+        sinonimos_busqueda = ["camara", "lente"]
+        tipo_repuesto_estandar = "camara"
 
     PRIORIDAD_PROVEEDORES = ["proveedor_one_services"]
 
@@ -122,29 +133,30 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
         # Le decimos a Supabase: Busca G5 "O" G05
         filtro_or = ",".join([f"nombre_consolidado.ilike.%{v}%" for v in variantes_db if v])
         
+        repuestos_filtrados = []
+        
+        # ---------------------------------------------------------
+        # BUSQUEDA 1: BASE DE DATOS (One Services)
+        # ---------------------------------------------------------
         for proveedor in PRIORIDAD_PROVEEDORES:
             respuesta = supabase.table("productos").select("*").eq("client_id", proveedor).or_(filtro_or).execute()
             resultados = respuesta.data
             
             if not resultados: continue 
                 
-            repuestos_filtrados = []
             for rep in resultados:
                 nombre_bd = str(rep.get('nombre_consolidado', '')).upper()
                 texto_bd_lower = nombre_bd.lower().replace('ó', 'o').replace('á', 'a').replace('í', 'i')
                 
-                # Chequeamos si alguno de los sinónimos (ej: "conector") está en el nombre
                 coincide_tipo = any(sin in texto_bd_lower for sin in sinonimos_busqueda)
                 
                 if coincide_tipo:
-                    # Aplicamos validación láser de modelo 
                     nombre_limpio_sku = nombre_bd.replace('/', ' ').replace('-', ' ').replace('(', ' ').replace(')', ' ')
                     nombre_pad = f" {nombre_limpio_sku} "
                     
                     coincide_todo = True
                     for t in modelo_limpio.split():
                         t_str = str(t).strip()
-                        
                         variantes_termino = [t_str]
                         if len(t_str) == 2 and t_str[0].isalpha() and t_str[1].isdigit():
                             variantes_termino.append(f"{t_str[0]}0{t_str[1]}") 
@@ -163,57 +175,71 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
                     
                     if coincide_todo:
                         repuestos_filtrados.append(rep)
-                    
-            if not repuestos_filtrados: continue
-                
-            if len(repuestos_filtrados) == 1:
-                repuesto = repuestos_filtrados[0]
-                lista, efectivo, tarjeta, cuota = aplicar_calculadora(repuesto['precio'])
-                return f"""ÉXITO. Encontré el repuesto: {repuesto['nombre_consolidado']}.
-                PRECIOS FINALES:
-                - Efectivo: ${efectivo}
-                - Transferencia (Lista): ${lista}
-                - Tarjeta: ${tarjeta} (3 cuotas de ${cuota})
-                INSTRUCCIÓN IA: Es un repuesto simple. Usa el formato de UNA SOLA OPCIÓN. PROHIBIDO mencionar calidad, premium, original o alternativas. Solo pasa los números."""
-            
-            else:
-                def calcular_prioridad(nombre):
-                    n = nombre.upper()
-                    base = 6.0 
-                    if "OLED" in n: base = 1.0
-                    elif "ORIG" in n or "ORI" in n: base = 2.0
-                    elif "SUNLONG" in n or "JK" in n: base = 3.0
-                    elif "MARCO" in n or "C/MARCO" in n: base = 4.0
-                    elif "INCELL" in n: base = 5.0
-                    modificador = -0.1 if "SOFT" in n else (0.1 if "HARD" in n else 0.0)
-                    return base + modificador
-                
-                repuestos_ordenados = sorted(repuestos_filtrados, key=lambda x: calcular_prioridad(x['nombre_consolidado']))
-                
-                # 🧠 LÓGICA INTELIGENTE: 2 opciones para pantallas, 1 sola para el resto
-                es_pantalla = any(s in sinonimos_busqueda for s in ["modulo", "pantalla", "display"])
-                cantidad_opciones = 2 if es_pantalla else 1
-                
-                mejores_opciones = repuestos_ordenados[:cantidad_opciones]
-                
-                opciones_texto = ""
-                for r in mejores_opciones: 
-                    lista, efectivo, tarjeta, cuota = aplicar_calculadora(r['precio'])
-                    opciones_texto += f"- {r['nombre_consolidado']} -> EFVO: ${efectivo} | LISTA: ${lista} | TARJETA: ${tarjeta} (3 de ${cuota})\n"
-                
-                # 👇 EL CANDADO DE CALIDADES
-                if es_pantalla:
-                    instruccion_final = "INSTRUCCIÓN IA: Es un módulo/pantalla. Usa el formato de DOS OPCIONES y aplica tus reglas de traducción de calidades (Premium, Alternativa)."
-                else:
-                    instruccion_final = "INSTRUCCIÓN IA: Es un repuesto simple (pin, batería, tapa). Usa el formato de UNA SOLA OPCIÓN. Tienes ESTRICTAMENTE PROHIBIDO mencionar palabras como 'calidad', 'premium', 'original' o 'alternativa'. Solo pasa el precio directo."
 
-                return f"ATENCIÓN: Encontré opciones. Te paso las {len(mejores_opciones)} MEJORES:\n{opciones_texto}\n{instruccion_final}"
-                
-        # 👇 4. RED DE SEGURIDAD (SIN STOCK) - Fuera del bucle for
-        return """ATENCIÓN: Búsqueda completada. 0 resultados en la base de datos.
-        INSTRUCCIÓN IA: Dile al cliente que lamentablemente no nos figura stock de ese repuesto en este momento, pero que le pasas la consulta a los chicos del taller para ver si se puede conseguir a pedido. 
-        OBLIGATORIO: Agrega al final de tu respuesta la etiqueta secreta: [ASISTENCIA_HUMANA]"""
+        # ---------------------------------------------------------
+        # BUSQUEDA 2: PLAN B (Scraping i2c en tiempo real)
+        # ---------------------------------------------------------
+        if not repuestos_filtrados:
+            print(f"⚠️ Sin stock en One Services. Buscando en i2c...")
+            resultados_i2c = buscar_en_i2c(modelo_limpio, tipo_repuesto_estandar)
+            
+            if resultados_i2c:
+                print(f"✅ ¡Repuesto encontrado en i2c! ({len(resultados_i2c)} opciones)")
+                # Convertimos el formato de i2c para que el resto del código lo entienda
+                for r_i2c in resultados_i2c:
+                    repuestos_filtrados.append({
+                        'nombre_consolidado': f"[CALIDAD: {r_i2c['producto'].replace('Pantalla ', '')}] {r_i2c['producto']} {modelo_limpio}",
+                        'precio': r_i2c['precio_costo']
+                    })
         
+        # ---------------------------------------------------------
+        # PROCESAMIENTO FINAL Y COTIZACIÓN (Común para ambos proveedores)
+        # ---------------------------------------------------------
+        if not repuestos_filtrados:
+            return """ATENCIÓN: Búsqueda completada. 0 resultados en la base de datos y proveedores externos.
+            INSTRUCCIÓN IA: Dile al cliente que lamentablemente no nos figura stock de ese repuesto en este momento, pero que le pasas la consulta a los chicos del taller para ver si se puede conseguir a pedido. 
+            OBLIGATORIO: Agrega al final de tu respuesta la etiqueta secreta: [ASISTENCIA_HUMANA]"""
+            
+        if len(repuestos_filtrados) == 1:
+            repuesto = repuestos_filtrados[0]
+            lista, efectivo, tarjeta, cuota = aplicar_calculadora(repuesto['precio'])
+            return f"""ÉXITO. Encontré el repuesto: {repuesto['nombre_consolidado']}.
+            PRECIOS FINALES:
+            - Efectivo: ${efectivo}
+            - Transferencia (Lista): ${lista}
+            - Tarjeta: ${tarjeta} (3 cuotas de ${cuota})
+            INSTRUCCIÓN IA: Es un repuesto simple. Usa el formato de UNA SOLA OPCIÓN. PROHIBIDO mencionar calidad, premium, original o alternativas. Solo pasa los números."""
+        
+        else:
+            def calcular_prioridad(nombre):
+                n = nombre.upper()
+                base = 6.0 
+                if "OLED" in n: base = 1.0
+                elif "ORIG" in n or "ORI" in n or "SERVICE PACK" in n: base = 2.0
+                elif "SUNLONG" in n or "JK" in n or "CROWN" in n or "MS" in n: base = 3.0
+                elif "MARCO" in n or "C/MARCO" in n: base = 4.0
+                elif "INCELL" in n: base = 5.0
+                modificador = -0.1 if "SOFT" in n else (0.1 if "HARD" in n else 0.0)
+                return base + modificador
+            
+            repuestos_ordenados = sorted(repuestos_filtrados, key=lambda x: calcular_prioridad(x['nombre_consolidado']))
+            
+            es_pantalla = tipo_repuesto_estandar == "pantalla"
+            cantidad_opciones = 2 if es_pantalla else 1
+            mejores_opciones = repuestos_ordenados[:cantidad_opciones]
+            
+            opciones_texto = ""
+            for r in mejores_opciones: 
+                lista, efectivo, tarjeta, cuota = aplicar_calculadora(r['precio'])
+                opciones_texto += f"- {r['nombre_consolidado']} -> EFVO: ${efectivo} | LISTA: ${lista} | TARJETA: ${tarjeta} (3 de ${cuota})\n"
+            
+            if es_pantalla:
+                instruccion_final = "INSTRUCCIÓN IA: Es un módulo/pantalla. Usa el formato de DOS OPCIONES y aplica tus reglas de traducción de calidades (Premium, Alternativa)."
+            else:
+                instruccion_final = "INSTRUCCIÓN IA: Es un repuesto simple (pin, batería, tapa). Usa el formato de UNA SOLA OPCIÓN. Tienes ESTRICTAMENTE PROHIBIDO mencionar palabras como 'calidad', 'premium', 'original' o 'alternativa'. Solo pasa el precio directo."
+
+            return f"ATENCIÓN: Encontré opciones. Te paso las {len(mejores_opciones)} MEJORES:\n{opciones_texto}\n{instruccion_final}"
+            
     except Exception as e:
         import traceback
         print(f"🚨 [ERROR]:\n{traceback.format_exc()}")
