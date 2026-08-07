@@ -112,11 +112,15 @@ def agregar_etiqueta_chatwoot(conversation_id: str, etiqueta: str):
     }
     data = {"labels": [etiqueta]}
     try:
-        req.post(url, headers=headers, json=data)
+        respuesta = req.post(url, headers=headers, json=data)
+        if respuesta.status_code == 200:
+            print(f"🏷️ Etiqueta '{etiqueta}' agregada con éxito a la charla {conversation_id}.")
+        else:
+            print(f"❌ CHATWOOT RECHAZÓ LA ETIQUETA '{etiqueta}': {respuesta.text}")
     except Exception as e:
-        print(f"🚨 Error agregando etiqueta: {e}")
+        print(f"🚨 Error de conexión agregando etiqueta: {e}")
 
-def asignar_agente_chatwoot(conversation_id: str, agente_id: int = 1):
+def asignar_agente_chatwoot(conversation_id: str, agente_id: int = 0):
     url = f"{CHATWOOT_URL}/api/v1/accounts/{ACCOUNT_ID}/conversations/{conversation_id}/assignments"
     headers = {
         "api_access_token": API_TOKEN,
@@ -127,7 +131,10 @@ def asignar_agente_chatwoot(conversation_id: str, agente_id: int = 1):
     try:
         respuesta = req.post(url, headers=headers, json=data)
         if respuesta.status_code == 200:
-            print(f"👤 Conversación {conversation_id} asignada directamente al agente {agente_id} (Joa).")
+            if agente_id == 0:
+                print(f"👤 Conversación {conversation_id} enviada a bandeja 'Sin Asignar' (Todos los agentes).")
+            else:
+                print(f"👤 Conversación {conversation_id} asignada directamente al agente {agente_id}.")
         else:
             print(f"❌ Error asignando agente: {respuesta.text}")
     except Exception as e:
@@ -177,9 +184,10 @@ def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_
             
             # 3. Alertas visuales para Joa en Chatwoot
             cambiar_estado_chatwoot(conversation_id, status="open")
-            # 🔥 CAMBIO: ETIQUETA DERIVACIÓN BOT
-            agregar_etiqueta_chatwoot(conversation_id, "#derivado_bot")
-            asignar_agente_chatwoot(conversation_id, agente_id=1) 
+            # 🔥 ETIQUETA DERIVACIÓN BOT
+            agregar_etiqueta_chatwoot(conversation_id, "derivado_bot")
+            # 🔥 ACÁ DERIVAMOS A TODOS LOS AGENTES (Bandeja general)
+            asignar_agente_chatwoot(conversation_id, agente_id=0) 
             
             enviar_mensaje_chatwoot(conversation_id, "🛑 BOT PAUSADO: Gaspar derivó esta consulta. Revisá el historial arriba y tomá el control. (Para reactivarlo escribe /activar)", es_privado=True)
             
@@ -194,7 +202,7 @@ def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_
                 texto_burbuja = burbuja.strip()
                 if texto_burbuja:  # Verificamos que no esté vacío
                     enviar_mensaje_chatwoot(conversation_id, texto_burbuja)
-                    time.sleep(1.5)  # Pausa de 1.5 segundos entre cada globito
+                    time.sleep(4)  # Pausa de 4 segundos entre cada globito
 
     except Exception as e:
         import traceback
@@ -282,9 +290,10 @@ async def recibir_mensaje_chatwoot(request: Request, background_tasks: Backgroun
                 conversaciones_pausadas[conversation_id] = True
                 enviar_mensaje_chatwoot(conversation_id, "Recibí el archivo. Dame un ratito que se lo paso a los chicos del taller para que lo vean y te digo.")
                 cambiar_estado_chatwoot(conversation_id, status="open")
-                # 🔥 CAMBIO: ETIQUETA ARCHIVO RECIBIDO
-                agregar_etiqueta_chatwoot(conversation_id, "#archivo_recibido")
-                asignar_agente_chatwoot(conversation_id, agente_id=1) 
+                # 🔥 ETIQUETA ARCHIVO RECIBIDO
+                agregar_etiqueta_chatwoot(conversation_id, "archivo_recibido")
+                # 🔥 ACÁ DERIVAMOS A TODOS LOS AGENTES (Bandeja general)
+                asignar_agente_chatwoot(conversation_id, agente_id=0) 
                 enviar_mensaje_chatwoot(conversation_id, "🛑 BOT PAUSADO AUTOMÁTICAMENTE: El cliente envió un archivo.", es_privado=True)
                 return {"status": "ok"}
             
