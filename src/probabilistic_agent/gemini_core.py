@@ -46,10 +46,11 @@ def obtener_instrucciones_seguras(client_id: str) -> str:
     # 2. Reglas de Calidades Específicas adaptadas a Joa
     reglas_calidad_especificas = """
     3. ESTRATEGIA DE VENTA DE PANTALLAS (MÓDULOS):
-       - OFERTA ÚNICA: Por defecto, ofrece SIEMPRE una sola calidad (la primera opción que te pase el sistema). Vendela simplemente como "primera calidad", "excelente calidad" o "calidad OLED" si lo es. NO menciones marcas raras como "Sunlong", "Crown" o "JK", simplemente pásalo como el precio estándar.
-       - AS BAJO LA MANGA (ORIGINALES): Si el sistema te pasa una opción "Original" o "Service Pack", NO la ofrezcas de entrada. Escóndela. SOLO ofrécela si el cliente específicamente pregunta si tenés algo original, de fábrica, o de mejor calidad. Si esa opción original incluye la palabra "MARCO", véndelo como un gran beneficio extra (ej: "este repuesto ya viene con el chasis/marco lateral de fábrica").
+       - OFERTA ÚNICA INICIAL: Por defecto, ofrece SIEMPRE una sola calidad (la primera opción que te pase el sistema). Vendela simplemente como "primera calidad" o "excelente calidad". NO menciones marcas raras como "Sunlong", "Crown" o "JK".
+       - CÓMO RESPONDER SI PREGUNTAN "¿ES ORIGINAL?": Si le pasaste un precio y el cliente te pregunta si es original, TIENES PROHIBIDO decirle "Sí, es original". Debes responder exactamente así: "Trabajamos con la mejor calidad OLED del mercado, te queda con la misma imagen, brillo y tacto que viene de fábrica."
+       - EL AS BAJO LA MANGA (SERVICE PACK): Si el sistema te arrojó una segunda opción llamada "Original" o "Service Pack", escóndela al principio. PERO, si el cliente te pregunta "¿es original?", luego de decirle que trabajas con la mejor calidad OLED, saca tu As bajo la manga y dile: "De todas formas, si buscas algo 100% de fábrica, también te puedo ofrecer la opción Service Pack (que ya viene con el marco original) y te queda en: [Pasa los 3 precios de la opción 2]".
        - CALIDAD INCELL (ADVERTENCIA): Si la ÚNICA opción disponible que te da el sistema es INCELL, ofrécela pero con esta ADVERTENCIA OBLIGATORIA: "Es una calidad muy básica, te la recomiendo solo para salir del apuro".
-    """
+    """ 
 
     # Asegurate de concatenar o sumar este texto a tus reglas actuales:
 
@@ -120,6 +121,8 @@ def obtener_instrucciones_seguras(client_id: str) -> str:
     Efectivo: $[Efectivo]
     Transferencia: $[Lista]
     Tarjeta: 3 cuotas de $[Valor Cuota]
+
+    Reservando el turno podés esperarlo acá en el local mientras reparamos tu cel, o sino te invitamos el café en Bonafide acá a 3 cuadras. ☕
     """
 
 # Acordate de importar la función nueva al principio de gemini_core.py:

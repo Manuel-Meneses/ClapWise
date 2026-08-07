@@ -181,26 +181,24 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
                         repuestos_filtrados.append(rep)
 
         # ---------------------------------------------------------
-        # BUSQUEDA 2: PLAN B (Scraping i2c en tiempo real)
+        # BUSQUEDA 2: PLAN B (Buscamos SIEMPRE en i2c para tener el As bajo la manga)
         # ---------------------------------------------------------
-        if not repuestos_filtrados:
-            print(f"⚠️ Sin stock en One Services. Buscando en i2c...")
-            resultados_i2c = buscar_en_i2c(modelo_limpio, tipo_repuesto_estandar)
-            
-            if resultados_i2c:
-                print(f"✅ ¡Repuesto encontrado en i2c! ({len(resultados_i2c)} opciones)")
-                for r_i2c in resultados_i2c:
-                    nombre_i2c = r_i2c['producto'].upper()
-                    
-                    # REGLA JOA: Marco solo permitido si es Service Pack / Original
-                    if "MARCO" in nombre_i2c:
-                        if "SERVICE PACK" not in nombre_i2c and "ORIGINAL" not in nombre_i2c:
-                            continue
-                        
-                    repuestos_filtrados.append({
-                        'nombre_consolidado': f"[CALIDAD: {r_i2c['producto'].replace('Pantalla ', '')}] {r_i2c['producto']} {modelo_limpio}",
-                        'precio': r_i2c['precio_costo']
-                    })
+        print(f"Buscando también en i2c para ver si hay calidades superiores...")
+        resultados_i2c = buscar_en_i2c(modelo_limpio, tipo_repuesto_estandar)
+        
+        if resultados_i2c:
+            for r_i2c in resultados_i2c:
+                nombre_i2c = r_i2c['producto'].upper()
+                
+                # REGLA JOA: Marco solo permitido si es Service Pack / Original
+                if "MARCO" in nombre_i2c:
+                    if "SERVICE PACK" not in nombre_i2c and "ORIGINAL" not in nombre_i2c:
+                        continue
+                
+                repuestos_filtrados.append({
+                    'nombre_consolidado': f"[CALIDAD: {r_i2c['producto'].replace('Pantalla ', '')}] {r_i2c['producto']} {modelo_limpio}",
+                    'precio': r_i2c['precio_costo']
+                })
         
         # ---------------------------------------------------------
         # PROCESAMIENTO FINAL, FILTRADO Y ORDEN
