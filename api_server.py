@@ -1,4 +1,5 @@
 import os
+import time
 import asyncio
 import requests as req
 from fastapi import FastAPI, Request, BackgroundTasks
@@ -13,10 +14,13 @@ from src.probabilistic_agent.sync_one_services import sincronizar_one_services
 from src.probabilistic_agent.gemini_core import compilar_cerebro, obtener_instrucciones_seguras
 
 # ========================================================
-# 🧠 MEMORIA RAM DE PAUSAS (Diccionario simple)
+# 🧠 MEMORIA RAM DE PAUSAS Y CONTROL
 # ========================================================
 # Guarda IDs de conversación donde el bot está apagado. Ej: {"12345": True}
 conversaciones_pausadas = {}
+
+# Guarda los últimos mensajes que mandó el bot para no auto-pausarse
+mensajes_enviados_por_bot = []
 
 # ========================================================
 # ⚙️ CONFIGURACIÓN DEL RELOJ AUTOMÁTICO
@@ -63,6 +67,12 @@ def enviar_mensaje_chatwoot(conversation_id: str, texto_respuesta: str, es_priva
         "private": es_privado # Si es True, es una nota amarilla solo para Joa
     }
     
+    # 🔥 ANOTAMOS EL MENSAJE EN LA MEMORIA PARA NO AUTO-PAUSARNOS
+    if not es_privado:
+        mensajes_enviados_por_bot.append(texto_respuesta.strip())
+        if len(mensajes_enviados_por_bot) > 50:
+            mensajes_enviados_por_bot.pop(0) # Mantenemos la lista cortita
+            
     try:
         respuesta = req.post(url, headers=headers, json=data)
         if respuesta.status_code == 200:
@@ -106,6 +116,23 @@ def agregar_etiqueta_chatwoot(conversation_id: str, etiqueta: str):
     except Exception as e:
         print(f"🚨 Error agregando etiqueta: {e}")
 
+def asignar_agente_chatwoot(conversation_id: str, agente_id: int = 1):
+    url = f"{CHATWOOT_URL}/api/v1/accounts/{ACCOUNT_ID}/conversations/{conversation_id}/assignments"
+    headers = {
+        "api_access_token": API_TOKEN,
+        "Content-Type": "application/json"
+    }
+    data = {"assignee_id": agente_id}
+    
+    try:
+        respuesta = req.post(url, headers=headers, json=data)
+        if respuesta.status_code == 200:
+            print(f"👤 Conversación {conversation_id} asignada directamente al agente {agente_id} (Joa).")
+        else:
+            print(f"❌ Error asignando agente: {respuesta.text}")
+    except Exception as e:
+        print(f"🚨 Excepción asignando agente: {e}")
+
 # ========================================================
 # 🧠 TAREA DE FONDO (Procesa con Gemini y responde)
 # ========================================================
@@ -137,7 +164,7 @@ def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_
         else:
             respuesta_final = str(contenido)
         
-# 👇 LÓGICA DE DERIVACIÓN (Precios Altos, Modelos Raros)
+        # 👇 LÓGICA DE DERIVACIÓN (Precios Altos, Modelos Raros)
         if "[ASISTENCIA_HUMANA]" in respuesta_final:
             print(f"⚠️ Gaspar solicitó derivar la conversación {conversation_id} a Joa.")
             
@@ -151,22 +178,28 @@ def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_
             # 3. Alertas visuales para Joa en Chatwoot
             cambiar_estado_chatwoot(conversation_id, status="open")
             agregar_etiqueta_chatwoot(conversation_id, "Derivado Bot 🤖")
-            
-            # 🔥 ACÁ AGREGAMOS LA ASIGNACIÓN DIRECTA 🔥
             asignar_agente_chatwoot(conversation_id, agente_id=1) 
             
             enviar_mensaje_chatwoot(conversation_id, "🛑 BOT PAUSADO: Gaspar derivó esta consulta. Revisá el historial arriba y tomá el control. (Para reactivarlo escribe /activar)", es_privado=True)
             
         else:
-            # 🔥 ¡ESTO ES LO QUE FALTABA! 🔥
-            # Si NO hay pedido de derivación, mandamos la respuesta normal al cliente:
-            print(f"✅ Respuesta normal enviada a {conversation_id}")
-            enviar_mensaje_chatwoot(conversation_id, respuesta_final)
+            # 🔥 Sistema de múltiples burbujas (Saltos en WhatsApp) 🔥
+            print(f"✅ Respuesta normal procesada para {conversation_id}")
+            
+            # Cortamos la respuesta gigante cada vez que encontremos "||"
+            burbujas = respuesta_final.split("||")
+            
+            for burbuja in burbujas:
+                texto_burbuja = burbuja.strip()
+                if texto_burbuja:  # Verificamos que no esté vacío
+                    enviar_mensaje_chatwoot(conversation_id, texto_burbuja)
+                    time.sleep(1.5)  # Pausa de 1.5 segundos entre cada globito
 
     except Exception as e:
         import traceback
         print(f"🚨 Error crítico en el agente: {traceback.format_exc()}")
 
+# ========================================================
 # 📩 RECEPCIÓN DE MENSAJES (De Chatwoot hacia Render)
 # ========================================================
 @app.post("/webhook/chatwoot")
@@ -181,7 +214,6 @@ async def recibir_mensaje_chatwoot(request: Request, background_tasks: Backgroun
         # ----------------------------------------------------
         # 🛡️ VÁLVULA DE SEGURIDAD 1: FILTRO ANTI-GRUPOS DE WHATSAPP
         # ----------------------------------------------------
-        # Si el mensaje viene de un grupo, lo ignoramos por completo para evitar spam.
         sender_phone = str(body.get("sender", {}).get("phone_number", ""))
         sender_identifier = str(body.get("sender", {}).get("identifier", ""))
         
@@ -208,23 +240,22 @@ async def recibir_mensaje_chatwoot(request: Request, background_tasks: Backgroun
                 return {"status": "ok"}
 
         # ----------------------------------------------------
-        # 2. AUTO-PAUSA POR USO DE PLANTILLAS Y MACROS
+        # 2. AUTO-PAUSA POR USO DE PLANTILLAS Y MACROS (FILTRO NINJA)
         # ----------------------------------------------------
-        # Cuando Joa envía una plantilla de WhatsApp, Chatwoot lo registra como un template
         if event == "message_created" and message_type == "outgoing":
-            contenido = body.get("content", "")
-            es_template = body.get("content_attributes", {}).get("is_template", False)
+            contenido = body.get("content", "").strip()
             
-            # Si Joa mandó una plantilla o escribió él mismo (sin ser el bot)
-            # asumimos que él tomó el control y pausamos al bot automáticamente.
-            # EVITAMOS pausar si el mensaje lo mandó el bot mismo vía API.
-            es_bot = body.get("sender", {}).get("type") == "api"
-            
-            if not es_bot and (es_template or not body.get("private")):
-                if not conversaciones_pausadas.get(conversation_id):
-                    print(f"🤖 Auto-pausa: Se detectó actividad humana o plantilla en charla {conversation_id}")
-                    conversaciones_pausadas[conversation_id] = True
-                    enviar_mensaje_chatwoot(conversation_id, "🛑 BOT PAUSADO AUTOMÁTICAMENTE: Detecté que tomaste el control de la charla o enviaste una plantilla. (Para que vuelva el bot escribe /activar)", es_privado=True)
+            # 🔥 CONTROL NINJA: ¿Este texto lo acaba de mandar Gaspar?
+            if contenido in mensajes_enviados_por_bot:
+                # Fue Gaspar. Lo sacamos de la lista para no acumular basura.
+                mensajes_enviados_por_bot.remove(contenido)
+            else:
+                # Si no está en la lista y NO es una nota amarilla... ¡Fue Joa!
+                if not body.get("private"):
+                    if not conversaciones_pausadas.get(conversation_id):
+                        print(f"🤖 Auto-pausa: Joa tomó el control en la charla {conversation_id}")
+                        conversaciones_pausadas[conversation_id] = True
+                        enviar_mensaje_chatwoot(conversation_id, "🛑 BOT PAUSADO AUTOMÁTICAMENTE: Detecté que tomaste el control de la charla o enviaste una plantilla. (Para que vuelva el bot escribe /activar)", es_privado=True)
 
         # ----------------------------------------------------
         # 3. PROCESAMIENTO DE MENSAJES DEL CLIENTE
@@ -244,7 +275,7 @@ async def recibir_mensaje_chatwoot(request: Request, background_tasks: Backgroun
                 enviar_mensaje_chatwoot(conversation_id, "Recibí el archivo. Dame un ratito que se lo paso a los chicos del taller para que lo vean y te digo.")
                 cambiar_estado_chatwoot(conversation_id, status="open")
                 agregar_etiqueta_chatwoot(conversation_id, "Archivo Recibido 📎")
-                asignar_agente_chatwoot(conversation_id, agente_id=1) # ACORDATE DE CAMBIAR EL ID SI LO ESTÁS PROBANDO VOS
+                asignar_agente_chatwoot(conversation_id, agente_id=1) 
                 enviar_mensaje_chatwoot(conversation_id, "🛑 BOT PAUSADO AUTOMÁTICAMENTE: El cliente envió un archivo.", es_privado=True)
                 return {"status": "ok"}
             
@@ -262,20 +293,3 @@ async def recibir_mensaje_chatwoot(request: Request, background_tasks: Backgroun
         import traceback
         print(f"🚨 Error leyendo Webhook de Chatwoot: {traceback.format_exc()}")
         return {"status": "error"}
-
-def asignar_agente_chatwoot(conversation_id: str, agente_id: int = 1):
-    url = f"{CHATWOOT_URL}/api/v1/accounts/{ACCOUNT_ID}/conversations/{conversation_id}/assignments"
-    headers = {
-        "api_access_token": API_TOKEN,
-        "Content-Type": "application/json"
-    }
-    data = {"assignee_id": agente_id}
-    
-    try:
-        respuesta = req.post(url, headers=headers, json=data)
-        if respuesta.status_code == 200:
-            print(f"👤 Conversación {conversation_id} asignada directamente al agente {agente_id} (Joa).")
-        else:
-            print(f"❌ Error asignando agente: {respuesta.text}")
-    except Exception as e:
-        print(f"🚨 Excepción asignando agente: {e}")
