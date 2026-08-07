@@ -206,39 +206,62 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
         if not repuestos_filtrados:
             return """ATENCIÓN: Búsqueda completada. 0 resultados en la base de datos y proveedores externos.
             INSTRUCCIÓN IA: Dile al cliente rápido y sin vueltas que no te figura stock en sistema, pero que "ahí le aviso a los chicos". No des más explicaciones.
-            OBLIGATORIO: Agrega al final de tu respuesta la etiqueta secreta: [ASISTENCIA_HUMANA]""" 
+            OBLIGATORIO: Agrega al final de tu respuesta la etiqueta secreta: [ASISTENCIA_HUMANA]"""
+
+        # 🔥 NUEVO SISTEMA NINJA DE PRIORIDADES: 
+        # Garantizamos que la Opción 1 sea normal (OLED) y la Opción 2 sea SIEMPRE el As bajo la manga (Original).
+        normales = []
+        originales = []
+
+        for r in repuestos_filtrados:
+            n = r['nombre_consolidado'].upper()
+            # Si dice ORIG, ORI o SERVICE PACK, va a la bolsa de Premium
+            if "ORIG" in n or "ORI" in n or "SERVICE PACK" in n:
+                originales.append(r)
+            else:
+                normales.append(r)
+
+        # Ordenamos los normales para que el OLED gane siempre el primer lugar
+        def prio_normal(r):
+            n = r['nombre_consolidado'].upper()
+            if "OLED" in n: return 1
+            if "SUNLONG" in n or "JK" in n or "CROWN" in n or "MS" in n: return 2
+            if "INCELL" in n: return 4
+            return 3
+        
+        normales_ordenados = sorted(normales, key=prio_normal)
+
+        mejores_opciones = []
+        
+        # 1. Metemos la mejor opción normal (OLED, etc.) en el PUESTO 1
+        if normales_ordenados:
+            mejores_opciones.append(normales_ordenados[0])
+        elif originales: 
+            # Si por milagro solo hay originales en todo el sistema
+            mejores_opciones.append(originales[0])
+
+        # 2. Metemos el As bajo la manga (El Original / Service Pack) en el PUESTO 2
+        if originales and originales[0] not in mejores_opciones:
+            mejores_opciones.append(originales[0])
             
-        # NUEVO SISTEMA DE PRIORIDADES DE JOA
-        def calcular_prioridad(nombre):
-            n = nombre.upper()
-            if "OLED" in n: return 1.0
-            elif "SUNLONG" in n or "JK" in n or "CROWN" in n or "MS" in n: return 2.0
-            elif "ORIG" in n or "ORI" in n or "SERVICE PACK" in n: return 3.0
-            elif "INCELL" in n: return 4.0
-            return 5.0
-        
-        repuestos_ordenados = sorted(repuestos_filtrados, key=lambda x: calcular_prioridad(x['nombre_consolidado']))
-        
-        mejores_opciones = repuestos_ordenados[:2]
-        
         opciones_texto = ""
         for i, r in enumerate(mejores_opciones): 
             lista, efectivo, tarjeta, cuota = aplicar_calculadora(r['precio'])
             
-            # 🚨 NUEVA REGLA DE JOA: LÍMITE DE $300.000 🚨
+            # 🚨 REGLA DE JOA: LÍMITE DE $300.000 🚨
             if efectivo >= 300000 or lista >= 300000:
                 return """ATENCIÓN: El repuesto es de ALTA GAMA y supera el límite de $300.000. 
-                INSTRUCCIÓN IA: TIENES PROHIBIDO DAR EL PRECIO. Dile ágilmente al cliente: 'Che, te cuento que ese repuesto es de alta gama. Le paso el caso a los chicos del taller para que lo revisen bien y te armen una cotización a medida.'
+                INSTRUCCIÓN IA: TIENES PROHIBIDO DAR EL PRECIO. Dile ágilmente al cliente: 'Che, te cuento que ese repuesto es de alta gama. Ahí te derivo con uno de mis compañeros para que te arme una cotización a medida.'
                 OBLIGATORIO: Agrega al final de tu respuesta la etiqueta secreta: [ASISTENCIA_HUMANA]"""
 
             opciones_texto += f"Opción {i+1}: {r['nombre_consolidado']} -> EFVO: ${efectivo} | LISTA: ${lista} | TARJETA: ${tarjeta} (3 de ${cuota})\n"
         
         instruccion_final = """INSTRUCCIÓN IA: Aplica tu ESTRATEGIA DE VENTA DE PANTALLAS. 
-        Ofrece SIEMPRE SOLO LA OPCIÓN 1 por defecto usando el formato de UNA SOLA OPCIÓN de tus reglas. No menciones marcas raras. 
-        Si la opción 2 es Original/Service Pack, guárdatela bajo la manga."""
+        Ofrece SIEMPRE SOLO LA OPCIÓN 1 por defecto. No menciones marcas raras. 
+        Si recibiste una Opción 2 que es Original/Service Pack, guárdatela en silencio bajo la manga. SOLO ofrécela si el cliente pregunta explícitamente si es original."""
 
         return f"ATENCIÓN: Encontré stock. Estos son los datos de sistema (NO SE LOS LEAS ASÍ AL CLIENTE):\n{opciones_texto}\n{instruccion_final}"
-            
+     
     except Exception as e:
         import traceback
         print(f"🚨 [ERROR]:\n{traceback.format_exc()}")
