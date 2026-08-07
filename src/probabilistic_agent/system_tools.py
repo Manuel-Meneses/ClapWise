@@ -207,8 +207,8 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
         # ---------------------------------------------------------
         if not repuestos_filtrados:
             return """ATENCIÓN: Búsqueda completada. 0 resultados en la base de datos y proveedores externos.
-            INSTRUCCIÓN IA: Dile al cliente que lamentablemente no nos figura stock de ese repuesto en este momento, pero que le pasas la consulta a los chicos del taller para ver si se puede conseguir a pedido. 
-            OBLIGATORIO: Agrega al final de tu respuesta la etiqueta secreta: [ASISTENCIA_HUMANA]"""
+            INSTRUCCIÓN IA: Dile al cliente rápido y sin vueltas que no te figura stock en sistema, pero que "ahí le aviso a los chicos". No des más explicaciones.
+            OBLIGATORIO: Agrega al final de tu respuesta la etiqueta secreta: [ASISTENCIA_HUMANA]""" 
             
         # NUEVO SISTEMA DE PRIORIDADES DE JOA
         def calcular_prioridad(nombre):

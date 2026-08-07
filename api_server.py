@@ -177,7 +177,8 @@ def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_
             
             # 3. Alertas visuales para Joa en Chatwoot
             cambiar_estado_chatwoot(conversation_id, status="open")
-            agregar_etiqueta_chatwoot(conversation_id, "Derivado Bot 🤖")
+            # 🔥 CAMBIO: ETIQUETA DERIVACIÓN BOT
+            agregar_etiqueta_chatwoot(conversation_id, "#derivado_bot")
             asignar_agente_chatwoot(conversation_id, agente_id=1) 
             
             enviar_mensaje_chatwoot(conversation_id, "🛑 BOT PAUSADO: Gaspar derivó esta consulta. Revisá el historial arriba y tomá el control. (Para reactivarlo escribe /activar)", es_privado=True)
@@ -281,7 +282,8 @@ async def recibir_mensaje_chatwoot(request: Request, background_tasks: Backgroun
                 conversaciones_pausadas[conversation_id] = True
                 enviar_mensaje_chatwoot(conversation_id, "Recibí el archivo. Dame un ratito que se lo paso a los chicos del taller para que lo vean y te digo.")
                 cambiar_estado_chatwoot(conversation_id, status="open")
-                agregar_etiqueta_chatwoot(conversation_id, "Archivo Recibido 📎")
+                # 🔥 CAMBIO: ETIQUETA ARCHIVO RECIBIDO
+                agregar_etiqueta_chatwoot(conversation_id, "#archivo_recibido")
                 asignar_agente_chatwoot(conversation_id, agente_id=1) 
                 enviar_mensaje_chatwoot(conversation_id, "🛑 BOT PAUSADO AUTOMÁTICAMENTE: El cliente envió un archivo.", es_privado=True)
                 return {"status": "ok"}
