@@ -134,8 +134,7 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
         filtro_or = ",".join([f"nombre_consolidado.ilike.%{v}%" for v in variantes_db if v])
         
         repuestos_filtrados = []
-        
-        # ---------------------------------------------------------
+       # ---------------------------------------------------------
         # BUSQUEDA 1: BASE DE DATOS (One Services)
         # ---------------------------------------------------------
         for proveedor in PRIORIDAD_PROVEEDORES:
@@ -146,8 +145,13 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
                 
             for rep in resultados:
                 nombre_bd = str(rep.get('nombre_consolidado', '')).upper()
-                texto_bd_lower = nombre_bd.lower().replace('ó', 'o').replace('á', 'a').replace('í', 'i')
                 
+                # REGLA ESTRICTA DE JOA: Bloquear "MARCO" a menos que sea Original
+                if "MARCO" in nombre_bd:
+                    if not any(palabra in nombre_bd for palabra in ["SERVICE PACK", "ORIG", "ORI"]):
+                        continue
+                
+                texto_bd_lower = nombre_bd.lower().replace('ó', 'o').replace('á', 'a').replace('í', 'i')
                 coincide_tipo = any(sin in texto_bd_lower for sin in sinonimos_busqueda)
                 
                 if coincide_tipo:
@@ -185,62 +189,59 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
             
             if resultados_i2c:
                 print(f"✅ ¡Repuesto encontrado en i2c! ({len(resultados_i2c)} opciones)")
-                # Convertimos el formato de i2c para que el resto del código lo entienda
                 for r_i2c in resultados_i2c:
+                    nombre_i2c = r_i2c['producto'].upper()
+                    
+                    # REGLA JOA: Marco solo permitido si es Service Pack / Original
+                    if "MARCO" in nombre_i2c:
+                        if "SERVICE PACK" not in nombre_i2c and "ORIGINAL" not in nombre_i2c:
+                            continue
+                        
                     repuestos_filtrados.append({
                         'nombre_consolidado': f"[CALIDAD: {r_i2c['producto'].replace('Pantalla ', '')}] {r_i2c['producto']} {modelo_limpio}",
                         'precio': r_i2c['precio_costo']
                     })
         
         # ---------------------------------------------------------
-        # PROCESAMIENTO FINAL Y COTIZACIÓN (Común para ambos proveedores)
+        # PROCESAMIENTO FINAL, FILTRADO Y ORDEN
         # ---------------------------------------------------------
         if not repuestos_filtrados:
             return """ATENCIÓN: Búsqueda completada. 0 resultados en la base de datos y proveedores externos.
             INSTRUCCIÓN IA: Dile al cliente que lamentablemente no nos figura stock de ese repuesto en este momento, pero que le pasas la consulta a los chicos del taller para ver si se puede conseguir a pedido. 
             OBLIGATORIO: Agrega al final de tu respuesta la etiqueta secreta: [ASISTENCIA_HUMANA]"""
             
-        if len(repuestos_filtrados) == 1:
-            repuesto = repuestos_filtrados[0]
-            lista, efectivo, tarjeta, cuota = aplicar_calculadora(repuesto['precio'])
-            return f"""ÉXITO. Encontré el repuesto: {repuesto['nombre_consolidado']}.
-            PRECIOS FINALES:
-            - Efectivo: ${efectivo}
-            - Transferencia (Lista): ${lista}
-            - Tarjeta: ${tarjeta} (3 cuotas de ${cuota})
-            INSTRUCCIÓN IA: Es un repuesto simple. Usa el formato de UNA SOLA OPCIÓN. PROHIBIDO mencionar calidad, premium, original o alternativas. Solo pasa los números."""
+        # NUEVO SISTEMA DE PRIORIDADES DE JOA
+        def calcular_prioridad(nombre):
+            n = nombre.upper()
+            if "OLED" in n: return 1.0
+            elif "SUNLONG" in n or "JK" in n or "CROWN" in n or "MS" in n: return 2.0
+            elif "ORIG" in n or "ORI" in n or "SERVICE PACK" in n: return 3.0
+            elif "INCELL" in n: return 4.0
+            return 5.0
         
-        else:
-            def calcular_prioridad(nombre):
-                n = nombre.upper()
-                base = 6.0 
-                if "OLED" in n: base = 1.0
-                elif "ORIG" in n or "ORI" in n or "SERVICE PACK" in n: base = 2.0
-                elif "SUNLONG" in n or "JK" in n or "CROWN" in n or "MS" in n: base = 3.0
-                elif "MARCO" in n or "C/MARCO" in n: base = 4.0
-                elif "INCELL" in n: base = 5.0
-                modificador = -0.1 if "SOFT" in n else (0.1 if "HARD" in n else 0.0)
-                return base + modificador
+        repuestos_ordenados = sorted(repuestos_filtrados, key=lambda x: calcular_prioridad(x['nombre_consolidado']))
+        
+        mejores_opciones = repuestos_ordenados[:2]
+        
+        opciones_texto = ""
+        for i, r in enumerate(mejores_opciones): 
+            lista, efectivo, tarjeta, cuota = aplicar_calculadora(r['precio'])
             
-            repuestos_ordenados = sorted(repuestos_filtrados, key=lambda x: calcular_prioridad(x['nombre_consolidado']))
-            
-            es_pantalla = tipo_repuesto_estandar == "pantalla"
-            cantidad_opciones = 2 if es_pantalla else 1
-            mejores_opciones = repuestos_ordenados[:cantidad_opciones]
-            
-            opciones_texto = ""
-            for r in mejores_opciones: 
-                lista, efectivo, tarjeta, cuota = aplicar_calculadora(r['precio'])
-                opciones_texto += f"- {r['nombre_consolidado']} -> EFVO: ${efectivo} | LISTA: ${lista} | TARJETA: ${tarjeta} (3 de ${cuota})\n"
-            
-            if es_pantalla:
-                instruccion_final = "INSTRUCCIÓN IA: Es un módulo/pantalla. Usa el formato de DOS OPCIONES y aplica tus reglas de traducción de calidades (Premium, Alternativa)."
-            else:
-                instruccion_final = "INSTRUCCIÓN IA: Es un repuesto simple (pin, batería, tapa). Usa el formato de UNA SOLA OPCIÓN. Tienes ESTRICTAMENTE PROHIBIDO mencionar palabras como 'calidad', 'premium', 'original' o 'alternativa'. Solo pasa el precio directo."
+            # 🚨 NUEVA REGLA DE JOA: LÍMITE DE $300.000 🚨
+            if efectivo >= 300000 or lista >= 300000:
+                return """ATENCIÓN: El repuesto es de ALTA GAMA y supera el límite de $300.000. 
+                INSTRUCCIÓN IA: TIENES PROHIBIDO DAR EL PRECIO. Dile ágilmente al cliente: 'Che, te cuento que ese repuesto es de alta gama. Le paso el caso a los chicos del taller para que lo revisen bien y te armen una cotización a medida.'
+                OBLIGATORIO: Agrega al final de tu respuesta la etiqueta secreta: [ASISTENCIA_HUMANA]"""
 
-            return f"ATENCIÓN: Encontré opciones. Te paso las {len(mejores_opciones)} MEJORES:\n{opciones_texto}\n{instruccion_final}"
+            opciones_texto += f"Opción {i+1}: {r['nombre_consolidado']} -> EFVO: ${efectivo} | LISTA: ${lista} | TARJETA: ${tarjeta} (3 de ${cuota})\n"
+        
+        instruccion_final = """INSTRUCCIÓN IA: Aplica tu ESTRATEGIA DE VENTA DE PANTALLAS. 
+        Ofrece SIEMPRE SOLO LA OPCIÓN 1 por defecto usando el formato de UNA SOLA OPCIÓN de tus reglas. No menciones marcas raras. 
+        Si la opción 2 es Original/Service Pack, guárdatela bajo la manga."""
+
+        return f"ATENCIÓN: Encontré stock. Estos son los datos de sistema (NO SE LOS LEAS ASÍ AL CLIENTE):\n{opciones_texto}\n{instruccion_final}"
             
     except Exception as e:
         import traceback
         print(f"🚨 [ERROR]:\n{traceback.format_exc()}")
-        return "Error técnico al calcular repuesto."
+        return "Error técnico al calcular repuesto." 
