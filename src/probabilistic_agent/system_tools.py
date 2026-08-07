@@ -209,14 +209,14 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
             OBLIGATORIO: Agrega al final de tu respuesta la etiqueta secreta: [ASISTENCIA_HUMANA]"""
 
         # 🔥 NUEVO SISTEMA NINJA DE PRIORIDADES: 
-        # Garantizamos que la Opción 1 sea normal (OLED) y la Opción 2 sea SIEMPRE el As bajo la manga (Original).
         normales = []
         originales = []
 
         for r in repuestos_filtrados:
             n = r['nombre_consolidado'].upper()
-            # Si dice ORIG, ORI o SERVICE PACK, va a la bolsa de Premium
-            if "ORIG" in n or "ORI" in n or "SERVICE PACK" in n:
+            # Ahora SÓLO los Service Pack van a la Opción 2. 
+            # (Evitamos que una OLED "Calidad Original" se meta en la bolsa equivocada)
+            if "SERVICE PACK" in n:
                 originales.append(r)
             else:
                 normales.append(r)

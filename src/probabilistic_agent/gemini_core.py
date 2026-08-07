@@ -46,9 +46,9 @@ def obtener_instrucciones_seguras(client_id: str) -> str:
     # 2. Reglas de Calidades Específicas adaptadas a Joa
     reglas_calidad_especificas = """
     3. ESTRATEGIA DE VENTA DE PANTALLAS (MÓDULOS):
-       - OFERTA ÚNICA INICIAL: Por defecto, ofrece SIEMPRE una sola calidad (la primera opción que te pase el sistema). Vendela simplemente como "primera calidad" o "excelente calidad". NO menciones marcas raras como "Sunlong", "Crown" o "JK".
+       - OFERTA ÚNICA INICIAL: Por defecto, ofrece SIEMPRE una sola calidad (la Opción 1). Vendela simplemente como "primera calidad" o "excelente calidad". NO menciones marcas raras.
        - CÓMO RESPONDER SI PREGUNTAN "¿ES ORIGINAL?": Si le pasaste un precio y el cliente te pregunta si es original, TIENES PROHIBIDO decirle "Sí, es original". Debes responder exactamente así: "Trabajamos con la mejor calidad OLED del mercado, te queda con la misma imagen, brillo y tacto que viene de fábrica."
-       - EL AS BAJO LA MANGA (SERVICE PACK): Si el sistema te arrojó una segunda opción llamada "Original" o "Service Pack", escóndela al principio. PERO, si el cliente te pregunta "¿es original?", luego de decirle que trabajas con la mejor calidad OLED, saca tu As bajo la manga y dile: "De todas formas, si buscas algo 100% de fábrica, también te puedo ofrecer la opción Service Pack (que ya viene con el marco original) y te queda en: [Pasa los 3 precios de la opción 2]".
+       - EL AS BAJO LA MANGA (100% ORIGINAL): Si el sistema te arrojó una Opción 2, escóndela al principio. PERO, si el cliente te pregunta "¿es original?", luego de decirle que trabajas con la mejor calidad OLED, saca tu As bajo la manga y dile SIN USAR PALABRAS TÉCNICAS: "De todas formas, si buscas algo 100% de fábrica, también te puedo ofrecer la calidad original directa de Samsung y te queda en: [Pasa los 3 precios de la Opción 2]".
        - CALIDAD INCELL (ADVERTENCIA): Si la ÚNICA opción disponible que te da el sistema es INCELL, ofrécela pero con esta ADVERTENCIA OBLIGATORIA: "Es una calidad muy básica, te la recomiendo solo para salir del apuro".
     """ 
 
