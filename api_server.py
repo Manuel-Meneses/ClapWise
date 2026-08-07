@@ -157,6 +157,12 @@ def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_
             
             enviar_mensaje_chatwoot(conversation_id, "🛑 BOT PAUSADO: Gaspar derivó esta consulta. Revisá el historial arriba y tomá el control. (Para reactivarlo escribe /activar)", es_privado=True)
             
+        else:
+            # 🔥 ¡ESTO ES LO QUE FALTABA! 🔥
+            # Si NO hay pedido de derivación, mandamos la respuesta normal al cliente:
+            print(f"✅ Respuesta normal enviada a {conversation_id}")
+            enviar_mensaje_chatwoot(conversation_id, respuesta_final)
+
     except Exception as e:
         import traceback
         print(f"🚨 Error crítico en el agente: {traceback.format_exc()}")
