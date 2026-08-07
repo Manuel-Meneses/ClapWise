@@ -217,7 +217,8 @@ async def recibir_mensaje_chatwoot(request: Request, background_tasks: Backgroun
         sender_phone = str(body.get("sender", {}).get("phone_number", ""))
         sender_identifier = str(body.get("sender", {}).get("identifier", ""))
         
-        if "-" in sender_phone or "@g.us" in sender_phone or "-" in sender_identifier or "@g.us" in sender_identifier:
+        # Eliminamos el bloqueo por guion ("-") porque Chatwoot usa UUIDs con guiones para clientes normales.
+        if "@g.us" in sender_phone or "@g.us" in sender_identifier:
             print(f"🤫 [FILTRO GRUPOS] Mensaje de grupo detectado en la charla {conversation_id}. Ignorando.")
             return {"status": "ok"}
             
@@ -239,24 +240,30 @@ async def recibir_mensaje_chatwoot(request: Request, background_tasks: Backgroun
                 enviar_mensaje_chatwoot(conversation_id, "✅ Bot reactivado. Gaspar responderá el próximo mensaje del cliente.", es_privado=True)
                 return {"status": "ok"}
 
+        
         # ----------------------------------------------------
-        # 2. AUTO-PAUSA POR USO DE PLANTILLAS Y MACROS (FILTRO NINJA)
+        # 2. AUTO-PAUSA POR USO DE PLANTILLAS Y MACROS (FILTRO NINJA MEJORADO)
         # ----------------------------------------------------
         if event == "message_created" and message_type == "outgoing":
             contenido = body.get("content", "").strip()
             
-            # 🔥 CONTROL NINJA: ¿Este texto lo acaba de mandar Gaspar?
-            if contenido in mensajes_enviados_por_bot:
-                # Fue Gaspar. Lo sacamos de la lista para no acumular basura.
-                mensajes_enviados_por_bot.remove(contenido)
-            else:
-                # Si no está en la lista y NO es una nota amarilla... ¡Fue Joa!
+            # 🔥 CONTROL NINJA MEJORADO: Búsqueda flexible
+            fue_gaspar = False
+            for msg_guardado in mensajes_enviados_por_bot:
+                # Comparamos si una parte del texto coincide (ignora espacios fantasmas de Chatwoot)
+                if contenido in msg_guardado or msg_guardado in contenido:
+                    fue_gaspar = True
+                    mensajes_enviados_por_bot.remove(msg_guardado)
+                    break
+                    
+            if not fue_gaspar:
+                # Si definitivamente no fue Gaspar y NO es una nota amarilla... ¡Fue Joa!
                 if not body.get("private"):
                     if not conversaciones_pausadas.get(conversation_id):
                         print(f"🤖 Auto-pausa: Joa tomó el control en la charla {conversation_id}")
                         conversaciones_pausadas[conversation_id] = True
                         enviar_mensaje_chatwoot(conversation_id, "🛑 BOT PAUSADO AUTOMÁTICAMENTE: Detecté que tomaste el control de la charla o enviaste una plantilla. (Para que vuelva el bot escribe /activar)", es_privado=True)
-
+        
         # ----------------------------------------------------
         # 3. PROCESAMIENTO DE MENSAJES DEL CLIENTE
         # ----------------------------------------------------
