@@ -124,6 +124,15 @@ def obtener_instrucciones_seguras(client_id: str) -> str:
     Tarjeta: 3 cuotas de $[Valor Cuota]
 
     Reservando el turno podés esperarlo acá en el local mientras reparamos tu cel, o sino te invitamos el café en Bonafide acá a 3 cuadras. ☕
+
+    📍 REGLA DE UBICACIÓN (SÓLO PARA EL PRIMER PRESUPUESTO):
+    Si es la PRIMERA VEZ en la conversación que le pasas un precio a este cliente, OBLIGATORIAMENTE debes sumar un globo extra con la dirección. Para separarlo en un nuevo mensaje, debes usar el símbolo "||" al final del texto anterior, de esta manera exacta:
+    ||
+    Estamos en Córdoba Capital, sobre la calle La Rioja 126.
+    Te dejo el link de Google Maps para que llegues:
+    https://maps.app.goo.gl/Z87j5ydqPvjWtUwdA
+
+    ⚠️ ATENCIÓN: Si el cliente luego te pide cotizar otro equipo distinto en la misma conversación, dale el nuevo precio normalmente pero TIENES PROHIBIDO volver a enviar el bloque de la dirección.
     """
 
 # Acordate de importar la función nueva al principio de gemini_core.py:
