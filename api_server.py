@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request, BackgroundTasks
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi.middleware.cors import CORSMiddleware
-from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
 # Importaciones de tu IA
 from src.probabilistic_agent.sync_excel import sincronizar_calculadora
@@ -21,6 +21,9 @@ conversaciones_pausadas = {}
 
 # Guarda los últimos mensajes que mandó el bot para no auto-pausarse
 mensajes_enviados_por_bot = []
+
+# Guarda las sesiones a las que ya se les curó la amnesia
+sesiones_hidratadas = set()
 
 # ========================================================
 # ⚙️ CONFIGURACIÓN DEL RELOJ AUTOMÁTICO
@@ -140,20 +143,70 @@ def asignar_agente_chatwoot(conversation_id: str, agente_id: int = 0):
     except Exception as e:
         print(f"🚨 Excepción asignando agente: {e}")
 
+def recuperar_historial_chatwoot(conversation_id: str):
+    """Va a buscar los últimos mensajes a Chatwoot y los formatea para LangChain"""
+    url = f"{CHATWOOT_URL}/api/v1/accounts/{ACCOUNT_ID}/conversations/{conversation_id}/messages"
+    headers = {
+        "api_access_token": API_TOKEN,
+        "Content-Type": "application/json"
+    }
+    historial_lc = []
+    
+    try:
+        respuesta = req.get(url, headers=headers)
+        if respuesta.status_code == 200:
+            mensajes = respuesta.json().get("payload", [])
+            
+            # Invertimos para que queden en orden cronológico, tomando solo los últimos 10
+            for msg in reversed(mensajes[:10]):
+                es_privado = msg.get("private", False)
+                tipo = msg.get("message_type")
+                contenido = msg.get("content")
+                
+                if contenido and not es_privado:
+                    if tipo == 0:  # Cliente
+                        historial_lc.append(HumanMessage(content=contenido))
+                    elif tipo == 1:  # Bot o Joa
+                        # Evitamos que el bot lea sus propias alertas de sistema o derivaciones
+                        if "🛑" not in contenido and "[ASISTENCIA_HUMANA]" not in contenido:
+                            historial_lc.append(AIMessage(content=contenido))
+    except Exception as e:
+        print(f"🚨 Error recuperando memoria de Chatwoot: {e}")
+        
+    return historial_lc
+
 # ========================================================
 # 🧠 TAREA DE FONDO (Procesa con Gemini y responde)
 # ========================================================
-def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_id: str):
+def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_id: str, usuario_meta: str = "", red_social: str = ""):
     print(f"🧠 Gaspar está pensando la respuesta para {sender_id}...")
     
     try:
         agente = compilar_cerebro(sender_id)
         instrucciones = obtener_instrucciones_seguras("3g_servicio")
         
-        historial = [
-            SystemMessage(content=instrucciones),
-            HumanMessage(content=texto_cliente)
-        ]
+        historial = [SystemMessage(content=instrucciones)]
+        
+        # 🔥 RECUPERACIÓN DE MEMORIA ANTI-AMNESIA DE RENDER
+        if conversation_id not in sesiones_hidratadas:
+            print(f"🔄 Render despertó. Inyectando historial de Chatwoot para la charla {conversation_id}...")
+            mensajes_viejos = recuperar_historial_chatwoot(conversation_id)
+            
+            # Evitamos duplicar el mensaje actual si Chatwoot ya lo incluyó en el historial descargado
+            if mensajes_viejos and isinstance(mensajes_viejos[-1], HumanMessage) and mensajes_viejos[-1].content.strip() == texto_cliente.strip():
+                mensajes_viejos.pop()
+                
+            historial.extend(mensajes_viejos)
+            sesiones_hidratadas.add(conversation_id)
+            print("✅ Historial inyectado con éxito.")
+            
+        
+        if usuario_meta:
+            nota_oculta = f"\n\n(Nota del sistema: El cliente te escribe desde {red_social} y su usuario es @{usuario_meta}. Asegurate de agregar este @usuario en la descripción del evento al agendar el turno)."
+            texto_cliente = texto_cliente + nota_oculta
+            
+        # Agregamos el mensaje actual del cliente
+        historial.append(HumanMessage(content=texto_cliente))
         
         config_memoria = {"configurable": {"thread_id": str(sender_id)}}
         resultado = agente.invoke({"messages": historial}, config=config_memoria)
@@ -301,9 +354,15 @@ async def recibir_mensaje_chatwoot(request: Request, background_tasks: Backgroun
             texto_cliente = body.get("content", "")
             sender_id = str(body.get("sender", {}).get("id", ""))
             
+            # 🔥 EXTRAEMOS EL USUARIO DE INSTAGRAM/FACEBOOK (El handle)
+            atributos = body.get("sender", {}).get("additional_attributes", {})
+            usuario_meta = atributos.get("username") or atributos.get("screen_name") or ""
+            red_social = body.get("inbox", {}).get("name", "Chat")
+            
             if texto_cliente and conversation_id:
                 print(f"\n📩 [Chatwoot] Mensaje de {sender_id}: {texto_cliente}")
-                background_tasks.add_task(procesar_y_responder_fondo, texto_cliente, sender_id, conversation_id)
+                # Le pasamos el usuario_meta y la red_social a la tarea de fondo
+                background_tasks.add_task(procesar_y_responder_fondo, texto_cliente, sender_id, conversation_id, usuario_meta, red_social)
                 
         return {"status": "ok"}
         
