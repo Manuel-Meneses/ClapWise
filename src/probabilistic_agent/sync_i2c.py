@@ -106,6 +106,10 @@ def buscar_en_i2c(modelo_cliente: str, tipo_repuesto: str):
             titulo_limpio = quitar_tildes(titulo_original).upper()
             
             if tipo_repuesto == "pantalla":
+                # 🚫 FILTRO ASESINO PARA I2C (IGNORAR MECÁNICOS)
+                if "MECANICO" in titulo_limpio and not any(buena in titulo_limpio for buena in ["CROWN", "PREMIUM", "OLED"]):
+                    continue
+                    
                 # Ahora "MODULO" va a atrapar tanto a "Modulo" como a "Módulo"
                 if "MODULO" in titulo_limpio or "PANTALLA" in titulo_limpio:
                     calidad = clasificar_calidad_i2c(titulo_original) # Pasamos el original para mantener "CROWN", etc.
