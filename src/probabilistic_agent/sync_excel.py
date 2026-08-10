@@ -11,50 +11,87 @@ supabase: Client = create_client(
     os.environ.get("SUPABASE_KEY")
 )
 
-
-# ⚠️ ACÁ VAN TUS DOS LINKS PUBLICADOS (.CSV)
-URL_CSV_MATRIZ = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQVs9TGz9Er9UT26VQz8zLZv_uWyZRER2ZhEi8lsbCH2h7BaSjCYQMtRt7gYFi5X2Gfz76oEVYr6Jed/pub?gid=1157405509&single=true&output=csv"
+# ⚠️ TUS DOS LINKS PUBLICADOS (.CSV)
+URL_CSV_MATRIZ = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRQURuzYgPzF-_Uf9khnmEz36mVaMZQdg6UVsvdKFNbe1aA6YMDBfFqdZX4DeK1cAlyldNH72nFqsTk/pub?gid=256169068&single=true&output=csv"
 URL_CSV_INFO = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQVs9TGz9Er9UT26VQz8zLZv_uWyZRER2ZhEi8lsbCH2h7BaSjCYQMtRt7gYFi5X2Gfz76oEVYr6Jed/pub?gid=1169996528&single=true&output=csv"
 
 def sincronizar_calculadora():
     print("📥 Descargando datos desde Google Sheets...")
     
     try:
-# ==========================================
-        # 1. DESCARGAMOS LA MATRIZ MATEMÁTICA
+        # ==========================================
+        # 1. DESCARGAMOS LA MATRIZ MATEMÁTICA (NUEVO SISTEMA DE TRAMOS)
         # ==========================================
         
-        # Función antibalas para limpiar formatos de pesos argentinos
+        # Funciones antibalas para limpiar formatos
         def limpiar_dinero(valor):
+            if pd.isna(valor) or str(valor).lower().strip() == 'nan': return 0.0
             v = str(valor).replace('$', '').strip()
-            # Si el excel le agregó centavos (,00 o .00), se los amputamos
             if v.endswith(',00'): v = v[:-3]
             if v.endswith('.00'): v = v[:-3]
-            # Ahora sí, matamos puntos y comas de miles sin riesgo
             v = v.replace('.', '').replace(',', '')
-            return float(v) if v else 0.0
+            try:
+                return float(v)
+            except:
+                return 0.0
+
+        def limpiar_porcentaje(valor):
+            if pd.isna(valor) or str(valor).lower().strip() == 'nan': return 0.0
+            v = str(valor).replace('%', '').replace(',', '.').strip()
+            try:
+                val = float(v)
+                return val / 100 if val > 1 else val
+            except:
+                return 0.0
 
         df_matriz = pd.read_csv(URL_CSV_MATRIZ)
-        matriz_precios = []
+        
+        tramos = []
+        dto_efectivo = 0.15  # Valores por defecto por si falla el Excel
+        rec_3_cuotas = 0.18
+        rec_6_cuotas = 0.26
         
         for index, row in df_matriz.iterrows():
-            try:
-                min_cost = limpiar_dinero(row.iloc[0])
-                mo = limpiar_dinero(row.iloc[1])
+            # A) Buscar los porcentajes financieros (Columna 1 y 2 en el DataFrame)
+            col1 = str(row.iloc[1]).strip()
+            if col1 == "Descuento efectivo (%)":
+                dto_efectivo = limpiar_porcentaje(row.iloc[2])
+            elif col1 == "Recargo 3 cuotas (%)":
+                rec_3_cuotas = limpiar_porcentaje(row.iloc[2])
+            elif col1 == "Recargo 6 cuotas (%)":
+                rec_6_cuotas = limpiar_porcentaje(row.iloc[2])
                 
-                dto = float(str(row.iloc[2]).replace('%', '').replace(',', '.').strip())
-                rec = float(str(row.iloc[3]).replace('%', '').replace(',', '.').strip())
+            # B) Buscar los tramos de precios (Columnas 4, 5 y 6 en el DataFrame)
+            desde_str = str(row.iloc[4]).strip()
+            
+            # Filtramos para no leer títulos ni celdas vacías
+            if desde_str and desde_str.lower() != "nan" and desde_str != "Desde ($)":
+                try:
+                    desde = limpiar_dinero(row.iloc[4])
+                    hasta = limpiar_dinero(row.iloc[5])
+                    sumar = limpiar_dinero(row.iloc[6])
+                    
+                    if hasta > 0:
+                        tramos.append({
+                            "desde": desde,
+                            "hasta": hasta,
+                            "sumar": sumar
+                        })
+                except Exception as e:
+                    continue 
+                    
+        # Empaquetamos todo en un diccionario ordenado
+        reglas_matematicas = {
+            "tramos": tramos,
+            "descuento_efectivo": dto_efectivo,
+            "recargo_3_cuotas": rec_3_cuotas,
+            "recargo_6_cuotas": rec_6_cuotas
+        }
                 
-                if dto > 1: dto = dto / 100
-                if rec > 1: rec = rec / 100
-                
-                matriz_precios.append({"min": min_cost, "mo": mo, "dto": dto, "rec": rec})
-            except: continue 
-                
-        # Guardamos la matriz matemática para Python
+        # Guardamos la nueva matriz matemática para Python
         supabase.table("configuracion_clientes").upsert({
             "client_id": "matriz_calculo_interna",
-            "reglas_calculadora": json.dumps(matriz_precios)
+            "reglas_calculadora": json.dumps(reglas_matematicas)
         }).execute()
 
         # ==========================================
@@ -85,7 +122,7 @@ def sincronizar_calculadora():
             "reglas_calculadora": texto_final_ia
         }).execute()
         
-        print("🚀 ¡Sincronización completa! La info del local y la matriz están actualizadas.\n")
+        print("🚀 ¡Sincronización completa! La info del local y la NUEVA matriz están actualizadas.\n")
         
     except Exception as e:
         print(f"🚨 Error crítico al sincronizar: {e}")

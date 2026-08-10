@@ -69,7 +69,7 @@ def solicitar_asistencia_humana(client_id: str, numero_cliente: str, motivo: str
 
 @tool
 def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
-    """Busca repuestos, aplica la matriz de rentabilidad y devuelve los precios finales al cliente."""
+    """Busca repuestos, aplica la matriz de rentabilidad por tramos y devuelve los precios finales al cliente."""
     print(f"\n🔍 [SISTEMA] Buscando: '{modelo}' | Repuesto: '{tipo_repuesto}'")
     
     # 1. 🧠 DICCIONARIO DE SINÓNIMOS PARA REPUESTOS (Soluciona Pin vs Conector)
@@ -98,20 +98,32 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
     PRIORIDAD_PROVEEDORES = ["proveedor_one_services"]
 
     try:
-        # Descargar la matriz de cálculo
+        # Descargar la NUEVA matriz de cálculo (Formato de Tramos)
         respuesta_matriz = supabase.table("configuracion_clientes").select("reglas_calculadora").eq("client_id", "matriz_calculo_interna").execute()
-        matriz_raw = respuesta_matriz.data[0]["reglas_calculadora"] if respuesta_matriz.data else "[]"
-        matriz = sorted(json.loads(matriz_raw), key=lambda x: x['min'], reverse=True)
+        
+        # Si no hay matriz cargada o hay error, usamos valores por defecto seguros
+        matriz_default = {"tramos": [], "descuento_efectivo": 0.15, "recargo_3_cuotas": 0.18}
+        matriz_raw = respuesta_matriz.data[0]["reglas_calculadora"] if respuesta_matriz.data else json.dumps(matriz_default)
+        matriz_data = json.loads(matriz_raw)
 
         def aplicar_calculadora(costo_base):
-            mo, dto, rec = 35000, 0.16, 0.25
-            for rango in matriz:
-                if costo_base >= rango['min']:
-                    mo, dto, rec = rango['mo'], rango['dto'], rango['rec']
+            # Extraemos los datos del diccionario nuevo
+            tramos = matriz_data.get("tramos", [])
+            dto = matriz_data.get("descuento_efectivo", 0.15)
+            rec = matriz_data.get("recargo_3_cuotas", 0.18)
+            
+            monto_a_sumar = 35000 # Valor base por si el costo no cae en ningún tramo
+            
+            # Buscamos en qué escalón cae el repuesto
+            for tramo in tramos:
+                if tramo["desde"] <= costo_base <= tramo["hasta"]:
+                    monto_a_sumar = tramo["sumar"]
                     break
-            lista = costo_base + mo
+                    
+            lista = costo_base + monto_a_sumar
             efectivo = lista * (1 - dto)
             tarjeta = lista * (1 + rec)
+            
             return int(lista), int(efectivo), int(tarjeta), int(tarjeta / 3)
 
         # 2. 🧠 LIMPIEZA DE MARCAS (Soluciona que el proveedor no escriba "Moto")
@@ -265,4 +277,4 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
     except Exception as e:
         import traceback
         print(f"🚨 [ERROR]:\n{traceback.format_exc()}")
-        return "Error técnico al calcular repuesto." 
+        return "Error técnico al calcular repuesto."
