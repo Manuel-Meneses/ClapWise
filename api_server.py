@@ -144,7 +144,8 @@ def asignar_agente_chatwoot(conversation_id: str, agente_id: int = 0):
         print(f"🚨 Excepción asignando agente: {e}")
 
 def recuperar_historial_chatwoot(conversation_id: str):
-    """Va a buscar los últimos mensajes a Chatwoot y los formatea para LangChain"""
+    """Va a buscar los últimos mensajes a Chatwoot, los formatea para LangChain
+       y les INYECTA LA FECHA Y HORA para que la IA no pierda la noción del tiempo."""
     url = f"{CHATWOOT_URL}/api/v1/accounts/{ACCOUNT_ID}/conversations/{conversation_id}/messages"
     headers = {
         "api_access_token": API_TOKEN,
@@ -163,13 +164,24 @@ def recuperar_historial_chatwoot(conversation_id: str):
                 tipo = msg.get("message_type")
                 contenido = msg.get("content")
                 
+                # 🔥 TRUCO DEL TIEMPO: Extraemos el timestamp de Chatwoot
+                timestamp_unix = msg.get("created_at")
+                fecha_hora_texto = ""
+                
+                if timestamp_unix:
+                    # Convertimos el número de Chatwoot a una hora legible de Argentina (UTC-3)
+                    dt = datetime.fromtimestamp(timestamp_unix, timezone.utc) - timedelta(hours=3)
+                    fecha_hora_texto = f" [Enviado el {dt.strftime('%d/%m a las %H:%M')}]"
+                
                 if contenido and not es_privado:
                     if tipo == 0:  # Cliente
-                        historial_lc.append(HumanMessage(content=contenido))
+                        # Le pegamos la fecha y hora al final del texto del cliente
+                        historial_lc.append(HumanMessage(content=f"{contenido}{fecha_hora_texto}"))
                     elif tipo == 1:  # Bot o Joa
                         # Evitamos que el bot lea sus propias alertas de sistema o derivaciones
                         if "🛑" not in contenido and "[ASISTENCIA_HUMANA]" not in contenido:
-                            historial_lc.append(AIMessage(content=contenido))
+                            # Le pegamos la fecha y hora al final del texto del bot/Joa
+                            historial_lc.append(AIMessage(content=f"{contenido}{fecha_hora_texto}"))
     except Exception as e:
         print(f"🚨 Error recuperando memoria de Chatwoot: {e}")
         
