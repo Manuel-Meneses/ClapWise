@@ -13,7 +13,7 @@ from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from src.probabilistic_agent.sync_excel import sincronizar_calculadora
 from src.probabilistic_agent.sync_one_services import sincronizar_one_services
 from src.probabilistic_agent.gemini_core import compilar_cerebro, obtener_instrucciones_seguras
-from sync_mundo_parts import sincronizar_mundo_parts
+from src.probabilistic_agent.sync_mundo_parts import sincronizar_mundo_parts 
 
 # ========================================================
 # 🧠 MEMORIA RAM DE PAUSAS Y CONTROL
