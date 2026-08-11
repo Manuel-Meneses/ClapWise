@@ -203,10 +203,10 @@ def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_
     print(f"🧠 Gaspar está pensando la respuesta para {sender_id}...")
     
     try:
-        agente = compilar_cerebro(sender_id)
-        instrucciones = obtener_instrucciones_seguras("3g_servicio")
+        # 🔥 CORRECCIÓN CRÍTICA: Le decimos al cerebro que somos "3g_servicio"
+        agente = compilar_cerebro("3g_servicio") 
         
-            # 🔥 EL HISTORIAL AHORA ARRANCA LIMPIO (Las reglas ya están en el state_modifier)
+        # 🔥 EL HISTORIAL ARRANCA LIMPIO (Las reglas ya están inyectadas nativamente)
         historial = []
         
         # 🔥 RECUPERACIÓN DE MEMORIA ANTI-AMNESIA DE RENDER

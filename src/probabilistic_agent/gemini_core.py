@@ -25,8 +25,7 @@ supabase: Client = create_client(
 # Inicializamos la memoria global
 memoria_global = MemorySaver()
 
-# DICCIONARIO GLOBAL: Acá guardaremos las instrucciones sin tocar el agente
-prompts_por_agente = {}
+
 
 def obtener_fecha_actual():
     # Esto le dice a Gaspar exactamente qué día y hora es en Argentina
@@ -193,42 +192,5 @@ def compilar_cerebro(client_id: str):
         state_modifier=instrucciones # LangGraph ahora lo maneja nativamente sin duplicarlo
     )
     
-    # (Opcional) Lo seguimos guardando en tu diccionario por si lo necesitas leer desde otro lado
-    prompts_por_agente[id(agente)] = instrucciones
     
     return agente
-
-def procesar_mensaje_whatsapp(mensaje_usuario: str, numero_cliente: str, agente) -> str:
-    mensaje_limpio = mensaje_usuario.lower().strip()
-    
-    # 1. LA VÁLVULA DE ESCAPE (Humanizada 100%, sin emojis ni menciones a "bot")
-    palabras_escape = ["humano", "asesor", "persona", "hablar con alguien", "bot", "maquina"]
-    if any(palabra in mensaje_limpio for palabra in palabras_escape):
-        return "Dale, ahí le aviso a Joa para que te conteste él directamente. Bancame un ratito."
-
-    try:
-        # 2. INYECCIÓN DEL PROMPT EN TIEMPO REAL
-        prompt_maestro = prompts_por_agente.get(id(agente), "Eres un asesor de ventas del local.")
-        
-        mensajes_entrada = [
-            SystemMessage(content=prompt_maestro, id="instrucciones_base_unicas"),
-            HumanMessage(content=mensaje_usuario)
-        ]
-        
-        respuesta_cruda = agente.invoke(
-            {"messages": mensajes_entrada}, 
-            config={"configurable": {"thread_id": numero_cliente}}
-        )
-        texto_final = respuesta_cruda["messages"][-1].content
-        
-        return texto_final
-
-    except Exception as e:
-        error_str = str(e)
-        print(f"🚨 ERROR CRÍTICO CAPTURADO: {error_str}")
-        
-        # 3. MANEJO DE ERRORES HUMANIZADO (Excusas reales de mostrador)
-        if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
-            return "Che, se me trabó el sistema de gestión un segundito. ¿Me repetís la consulta así te lo busco bien?"
-        
-        return "Se me cortó el internet acá en el local justo cuando estaba buscando tu repuesto. ¿Me lo decís de nuevo?"

@@ -3,6 +3,7 @@ import re
 import unicodedata
 import pandas as pd
 from dotenv import load_dotenv
+import requests
 from supabase import create_client, Client
 
 load_dotenv()
@@ -85,8 +86,16 @@ def sincronizar_mundo_parts():
         url_descarga = URL_GOOGLE_SHEETS.split("/edit")[0] + "/export?format=xlsx"
         
     try:
-        diccionario_hojas = pd.read_excel(url_descarga, sheet_name=None)
+        # 🔥 NUEVO MÉTODO DE DESCARGA: Primero lo bajamos al servidor, después lo lee Pandas
+        respuesta = requests.get(url_descarga, timeout=120) 
+        respuesta.raise_for_status() 
+        
+        with open("temp_mundo_parts.xlsx", "wb") as f:
+            f.write(respuesta.content)
+            
+        diccionario_hojas = pd.read_excel("temp_mundo_parts.xlsx", sheet_name=None, dtype=str)
         lote_total = []
+
         
         for nombre_hoja, df in diccionario_hojas.items():
             if "joystick" in nombre_hoja.lower():
