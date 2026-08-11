@@ -388,8 +388,7 @@ async def recibir_mensaje_chatwoot(request: Request, background_tasks: Backgroun
                 # Susurro más profesional (30 minutos)
                 if ultima_vez and (ahora - ultima_vez > timedelta(minutes=30)):
                     print(f"🕒 Pasaron más de 30 mins. Preparando susurro de contexto para {conversation_id}.")
-                    nota_tiempo = "\n\n(Nota oculta del sistema: El cliente vuelve a escribir después de un tiempo. Si SOLO saluda, responde de forma CORTA Y PROFESIONAL (ej: '¡Hola! ¿En qué te puedo ayudar?'). Tienes ESTRICTAMENTE PROHIBIDO usar frases como 'Hola de nuevo', 'cómo andas' o 'darte una mano'. No repitas cosas del pasado a menos que pregunte.)\n\n"
-                
+                    nota_tiempo = "\n\n(Nota oculta del sistema: El cliente vuelve a escribir después de un tiempo. Si SOLO te saluda, responde EXCLUSIVAMENTE preguntando en qué lo podés ayudar. Tienes ESTRICTAMENTE PROHIBIDO adelantarte y mencionar modelos de celulares (ej: S9, J6), fallas o repuestos de los que hablaron antes. Haz de cuenta que la charla empieza de cero y espera a que él te diga de qué equipo quiere hablar hoy.)\n\n" 
                 ultima_interaccion[conversation_id] = ahora
                 
                 # Agrupamos los mensajes
