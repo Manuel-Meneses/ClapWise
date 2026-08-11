@@ -252,23 +252,17 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
             
         opciones_texto = ""
         for i, r in enumerate(mejores_opciones): 
-            # AQUÍ AHORA RECIBIMOS LAS 6 VARIABLES
+        # AQUÍ RECIBIMOS LAS VARIABLES DE LA CALCULADORA
             lista, efectivo, tarjeta, cuota, tarjeta_6, cuota_6 = aplicar_calculadora(r['precio'])
-            
-            # 🚨 REGLA DE JOA: LÍMITE DE $300.000 🚨
-            if efectivo >= 300000 or lista >= 300000:
-                return """ATENCIÓN: El repuesto es de ALTA GAMA y supera el límite de $300.000. 
-                INSTRUCCIÓN IA: TIENES PROHIBIDO DAR EL PRECIO. Dile ágilmente al cliente: 'Che, te cuento que ese repuesto es de alta gama. Ahí te derivo con uno de mis compañeros para que te arme una cotización a medida.'
-                OBLIGATORIO: Agrega al final de tu respuesta la etiqueta secreta: [ASISTENCIA_HUMANA]"""
 
-            # AQUÍ LE PASAMOS A GASPAR LA INFO DE LAS 6 CUOTAS EN EL MISMO FORMATO QUE TENÍAS
+    # PASAMOS LA INFO DE PRECIOS DIRECTAMENTE A GASPAR SIN VERIFICAR MÁXIMOS
             opciones_texto += f"Opción {i+1}: {r['nombre_consolidado']} -> EFVO: ${efectivo} | LISTA: ${lista} | TARJETA: ${tarjeta} (3 de ${cuota}) | TARJETA 6: ${tarjeta_6} (6 de ${cuota_6})\n"
-        
-        instruccion_final = """INSTRUCCIÓN IA: Aplica tu ESTRATEGIA DE VENTA DE PANTALLAS. 
-        Ofrece SIEMPRE SOLO LA OPCIÓN 1 por defecto. No menciones marcas raras. 
-        Si recibiste una Opción 2 que es Original/Service Pack, guárdatela en silencio bajo la manga. SOLO ofrécela si el cliente pregunta explícitamente si es original."""
 
-        return f"ATENCIÓN: Encontré stock. Estos son los datos de sistema (NO SE LOS LEAS ASÍ AL CLIENTE):\n{opciones_texto}\n{instruccion_final}"
+            instruccion_final = """INSTRUCCIÓN IA: Aplica tu ESTRATEGIA DE VENTA DE PANTALLAS. 
+            Ofrece SIEMPRE SOLO LA OPCIÓN 1 por defecto. No menciones marcas raras. 
+            Si recibiste una Opción 2 que es Original/Service Pack, guárdatela en silencio bajo la manga. SOLO ofrécela si el cliente pregunta explícitamente si es original."""
+
+        return f"ATENCIÓN: Encontré stock. Estos son los datos de sistema (NO SE LOS LEAS ASÍ AL CLIENTE):\n{opciones_texto}\n{instruccion_final}" 
 
     except Exception as e:
         import traceback
