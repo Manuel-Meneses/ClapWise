@@ -1,8 +1,8 @@
-import datetime
 import os
 import time
 import asyncio
 import requests as req
+from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI, Request, BackgroundTasks
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -174,7 +174,7 @@ def recuperar_historial_chatwoot(conversation_id: str):
                 
                 if timestamp_unix:
                     # Convertimos el número de Chatwoot a una hora legible de Argentina (UTC-3)
-                    dt = datetime.fromtimestamp(timestamp_unix, datetime.timezone.utc) - datetime.timedelta(hours=3)
+                    dt = datetime.fromtimestamp(timestamp_unix, timezone.utc) - timedelta(hours=3)
                     fecha_hora_texto = f" [Enviado el {dt.strftime('%d/%m a las %H:%M')}]"
                 
                 if contenido and not es_privado:
