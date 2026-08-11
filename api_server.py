@@ -27,6 +27,11 @@ mensajes_enviados_por_bot = []
 # Guarda las sesiones a las que ya se les curó la amnesia
 sesiones_hidratadas = set()
 
+# 🔥 VARIABLES GLOBALES PARA LA SALA DE ESPERA Y EL SUSURRO
+mensajes_buffer = {}
+temporizadores_buffer = {}
+ultima_interaccion = {}
+
 # ========================================================
 # ⚙️ CONFIGURACIÓN DEL RELOJ AUTOMÁTICO
 # ========================================================
@@ -216,7 +221,6 @@ def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_
             sesiones_hidratadas.add(conversation_id)
             print("✅ Historial inyectado con éxito.")
             
-        
         if usuario_meta:
             nota_oculta = f"\n\n(Nota del sistema: El cliente te escribe desde {red_social} y su usuario es @{usuario_meta}. Asegurate de agregar este @usuario en la descripción del evento al agendar el turno)."
             texto_cliente = texto_cliente + nota_oculta
@@ -366,19 +370,59 @@ async def recibir_mensaje_chatwoot(request: Request, background_tasks: Backgroun
                 enviar_mensaje_chatwoot(conversation_id, "🛑 BOT PAUSADO AUTOMÁTICAMENTE: El cliente envió un archivo.", es_privado=True)
                 return {"status": "ok"}
             
-            # C) Si es texto normal y el bot NO está pausado, llamamos a Gemini
+            # C) 🔥 SALA DE ESPERA BLINDADA (CON MARCA DE TIEMPO)
             texto_cliente = body.get("content", "")
             sender_id = str(body.get("sender", {}).get("id", ""))
             
-            # 🔥 EXTRAEMOS EL USUARIO DE INSTAGRAM/FACEBOOK (El handle)
             atributos = body.get("sender", {}).get("additional_attributes", {})
             usuario_meta = atributos.get("username") or atributos.get("screen_name") or ""
             red_social = body.get("inbox", {}).get("name", "Chat")
             
             if texto_cliente and conversation_id:
-                print(f"\n📩 [Chatwoot] Mensaje de {sender_id}: {texto_cliente}")
-                # Le pasamos el usuario_meta y la red_social a la tarea de fondo
-                background_tasks.add_task(procesar_y_responder_fondo, texto_cliente, sender_id, conversation_id, usuario_meta, red_social)
+                print(f"\n📩 [Chatwoot] Mensaje retenido en sala de espera: {texto_cliente}")
+                
+                ahora = datetime.now()
+                ultima_vez = ultima_interaccion.get(conversation_id)
+                
+                nota_tiempo = ""
+                # Susurro más profesional (30 minutos)
+                if ultima_vez and (ahora - ultima_vez > timedelta(minutes=30)):
+                    print(f"🕒 Pasaron más de 30 mins. Preparando susurro de contexto para {conversation_id}.")
+                    nota_tiempo = "\n\n(Nota oculta del sistema: El cliente vuelve a escribir después de un tiempo. Si SOLO saluda, responde de forma CORTA Y PROFESIONAL (ej: '¡Hola! ¿En qué te puedo ayudar?'). Tienes ESTRICTAMENTE PROHIBIDO usar frases como 'Hola de nuevo', 'cómo andas' o 'darte una mano'. No repitas cosas del pasado a menos que pregunte.)\n\n"
+                
+                ultima_interaccion[conversation_id] = ahora
+                
+                # Agrupamos los mensajes
+                if conversation_id in mensajes_buffer:
+                    mensajes_buffer[conversation_id].append(texto_cliente)
+                else:
+                    mensajes_buffer[conversation_id] = [texto_cliente]
+                    
+                # ⏰ MARCAMOS EL TIEMPO EXACTO DEL ÚLTIMO MENSAJE
+                temporizadores_buffer[conversation_id] = time.time()
+                    
+                async def esperar_y_procesar(conv_id, s_id, u_meta, r_social, susurro):
+                    # ⏳ Esperamos 7 segundos incondicionalmente
+                    await asyncio.sleep(7) 
+                    
+                    # Verificamos si alguien más actualizó el temporizador mientras esperábamos
+                    tiempo_transcurrido = time.time() - temporizadores_buffer.get(conv_id, 0)
+                    
+                    # Si pasaron más de 6.5 segundos, significa que ESTE fue el último mensaje de la ráfaga. ¡Disparamos!
+                    if tiempo_transcurrido >= 6.5:
+                        textos = mensajes_buffer.pop(conv_id, [])
+                        if textos:
+                            mensaje_unido = "\n".join(textos)
+                            
+                            if susurro:
+                                mensaje_unido = susurro + mensaje_unido
+                                
+                            print(f"📦 Paquete completo enviado a Gaspar: '{mensaje_unido}'")
+                            # Procesamos de forma asíncrona para no bloquear el servidor
+                            await asyncio.to_thread(procesar_y_responder_fondo, mensaje_unido, s_id, conv_id, u_meta, r_social)
+
+                # Creamos la tarea de la sala de espera
+                asyncio.create_task(esperar_y_procesar(conversation_id, sender_id, usuario_meta, red_social, nota_tiempo))
                 
         return {"status": "ok"}
         
