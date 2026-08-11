@@ -39,8 +39,10 @@ def limpiar_precio(precio_str):
         if limpio:
             val = float(limpio)
             
-            # El traductor viejo por si siguen poniendo "45.5" en vez de 45500
-            if 0 < val < 100:
+            # CORRECCIÓN AQUÍ: 
+            # Si el valor es menor a 1500 (ningún repuesto vale menos de 1500 pesos hoy)
+            # asumimos que el proveedor abrevió los miles (ej: 358 -> 358000)
+            if 0 < val < 2000:
                 val = val * 1000
                 
             return val
