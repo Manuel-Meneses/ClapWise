@@ -29,6 +29,7 @@ sesiones_hidratadas = set()
 
 mensajes_buffer = {}
 temporizadores_buffer = {}
+ultima_interaccion = {}
 
 # ========================================================
 # ⚙️ CONFIGURACIÓN DEL RELOJ AUTOMÁTICO
