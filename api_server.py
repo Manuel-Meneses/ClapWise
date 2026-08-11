@@ -204,30 +204,24 @@ def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_
         agente = compilar_cerebro("3g_servicio") 
         instrucciones = obtener_instrucciones_seguras("3g_servicio")
         
-        # 🔥 INYECTAMOS CON ID FIJO: Así no gasta tokens de más
+        # 1. SIEMPRE arrancamos limpios solo con las reglas (Costo fijo, sin bola de nieve)
         historial = [SystemMessage(content=instrucciones, id="instrucciones_base_unicas")]
         
-        # 🔥 RECUPERACIÓN DE MEMORIA ANTI-AMNESIA DE RENDER
-        if conversation_id not in sesiones_hidratadas:
-            print(f"🔄 Render despertó. Inyectando historial de Chatwoot...")
-            mensajes_viejos = recuperar_historial_chatwoot(conversation_id)
-            
-            # Simplemente agregamos el bloque de texto si existe, sin usar pop()
-            if mensajes_viejos:
-                historial.extend(mensajes_viejos)
-                
-            sesiones_hidratadas.add(conversation_id)
-            print("✅ Historial inyectado con éxito.")
+        # 2. 🔥 EXTRACCIÓN DE MEMORIA CONTINUA
+        # Como el bot ahora no tiene memoria, Chatwoot ES nuestra única memoria.
+        mensajes_viejos = recuperar_historial_chatwoot(conversation_id)
+        if mensajes_viejos:
+            historial.extend(mensajes_viejos)
             
         if usuario_meta:
             nota_oculta = f"\n\n(Nota del sistema: El cliente te escribe desde {red_social} y su usuario es @{usuario_meta}. Asegurate de agregar este @usuario en la descripción del evento al agendar el turno)."
             texto_cliente = texto_cliente + nota_oculta
             
-        # Agregamos el mensaje actual del cliente al final
+        # 3. Sumamos el mensaje actual al final
         historial.append(HumanMessage(content=texto_cliente))
         
-        config_memoria = {"configurable": {"thread_id": str(sender_id)}}
-        resultado = agente.invoke({"messages": historial}, config=config_memoria)
+        # 4. 🔥 EJECUCIÓN LIMPIA: Le sacamos el config_memoria porque ya no usamos hilos (threads)
+        resultado = agente.invoke({"messages": historial})
         
         contenido = resultado["messages"][-1].content
         

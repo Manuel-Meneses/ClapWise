@@ -169,7 +169,7 @@ def agendar_turno(nombre_cliente: str, equipo_y_falla: str, fecha_hora_iso: str)
 def compilar_cerebro(client_id: str):
     """Ensambla el Agente."""
     llm = ChatGoogleGenerativeAI(
-        model="gemini-3.5-flash", # ¡Lo dejamos como lo tenías!
+        model="gemini-2.5-flash",
         temperature=0.3,
     )
     
@@ -179,7 +179,7 @@ def compilar_cerebro(client_id: str):
         buscar_costo_repuesto_real 
     ]
     
-    agente = create_react_agent(llm, herramientas, checkpointer=memoria_global)
+    agente = create_react_agent(llm, herramientas)
 
     
     return agente
