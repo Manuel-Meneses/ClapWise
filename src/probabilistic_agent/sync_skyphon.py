@@ -2,6 +2,7 @@ import os
 import re
 import unicodedata
 import pandas as pd
+import requests # 🔥 Usamos requests para evitar que Google corte la descarga
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
@@ -16,8 +17,19 @@ URL_GOOGLE_SHEETS_SKYPHON = "https://docs.google.com/spreadsheets/d/1ewZCtjpTRNz
 
 def limpiar_precio(precio_str):
     try:
-        limpio = re.sub(r'[^\d]', '', str(precio_str))
-        return float(limpio)
+        p_str = str(precio_str).replace('$', '').strip()
+        if not p_str or p_str.lower() == 'nan': return 0.0
+        
+        # Regla argentina: Si tiene punto y 3 números atrás (ej: 15.500), es separador de miles
+        if '.' in p_str and len(p_str.split('.')[-1]) == 3:
+            p_str = p_str.replace('.', '')
+        # Si tiene coma (centavos), la pasamos a punto
+        p_str = p_str.replace(',', '.')
+        
+        limpio = re.sub(r'[^\d.]', '', p_str)
+        if limpio:
+            return float(limpio)
+        return 0.0
     except:
         return 0.0
 
@@ -54,60 +66,97 @@ def sincronizar_skyphon():
         url_descarga = URL_GOOGLE_SHEETS_SKYPHON.split("/edit")[0] + "/export?format=xlsx"
         
     try:
-        diccionario_hojas = pd.read_excel(url_descarga, sheet_name=None)
+        print("⏳ Descargando archivo pesado desde Google Sheets...")
+        respuesta = requests.get(url_descarga, timeout=120) 
+        respuesta.raise_for_status() 
+        
+        with open("temp_skyphon.xlsx", "wb") as f:
+            f.write(respuesta.content)
+            
+        # Leemos el Excel como texto para evitar que Pandas redondee mal los números
+        diccionario_hojas = pd.read_excel("temp_skyphon.xlsx", sheet_name=None, dtype=str)
         lote_total = []
         
         for nombre_hoja, df in diccionario_hojas.items():
             print(f"📄 Procesando hoja: {nombre_hoja}...")
+            hoja_upper = quitar_tildes(nombre_hoja).upper()
             
             for index, row in df.iterrows():
-                try:
-                    celda_prod_raw = str(row.iloc[1])
-                    celda_precio_raw = str(row.iloc[2])
-                except IndexError:
-                    continue 
+                # 🔥 RADAR INTELIGENTE: Escaneamos de izquierda a derecha.
+                # Restamos 2 al límite para asegurarnos de que la celda actual tenga al menos dos celdas más a la derecha.
+                for col_idx in range(len(df.columns) - 2):
+                    celda_prod_raw = str(row.iloc[col_idx])
+                    celda_precio_1_raw = str(row.iloc[col_idx + 1]) # Precio 1
+                    celda_precio_2_raw = str(row.iloc[col_idx + 2]) # Precio 2 (Efectivo/Lista)
                 
-                # 🧹 ASPIRADORA EXTREMA: Mata saltos de línea (\n) y espacios múltiples
-                celda_prod = " ".join(celda_prod_raw.split())
-                celda_precio = " ".join(celda_precio_raw.split())
+                    celda_prod = " ".join(celda_prod_raw.split())
+                    celda_precio_1 = " ".join(celda_precio_1_raw.split())
+                    celda_precio_2 = " ".join(celda_precio_2_raw.split())
+                        
+                    # Filtramos basura, códigos cortos o encabezados
+                    if not celda_prod or len(celda_prod) < 3 or celda_prod.lower() in ['nan', 'descripción', 'codigo', 'código', 'módulos', 'precio', 'efectivo', 'lista', 'modelo', 'marca']:
+                        continue
                     
-                if not celda_prod or celda_prod.lower() in ['nan', 'descripción', 'codigo', 'módulos']:
-                    continue
-                
-                # 🔋 INYECTOR DE CATEGORÍAS (Para el problema de Skyphon)
-                # Si la hoja de Excel dice "Baterias" y el producto no lo dice, se lo agregamos.
-                if "BAT" in nombre_hoja.upper() and "BATERIA" not in celda_prod.upper():
-                    celda_prod = f"Batería {celda_prod}"
+                    precio_1_num = 0.0
+                    precio_2_num = 0.0
+                        
+                    # Comprobamos si la primera columna contigua parece dinero
+                    if "$" in celda_precio_1 or celda_precio_1.replace('.', '').replace(',', '').isdigit():
+                        precio_1_num = limpiar_precio(celda_precio_1)
                     
-                # 🚫 FILTRO DE BASURA MECÁNICA
-                prod_upper = celda_prod.upper()
-                if "MECANICO" in prod_upper and not any(buena in prod_upper for buena in ["CROWN", "PREMIUM", "OLED"]):
-                    continue 
+                    # Comprobamos si la segunda columna contigua parece dinero
+                    if "$" in celda_precio_2 or celda_precio_2.replace('.', '').replace(',', '').isdigit():
+                        precio_2_num = limpiar_precio(celda_precio_2)
+                        
+                    # 🔥 MATEMÁTICA PURA: Nos quedamos siempre con el precio más alto
+                    precio_final = max(precio_1_num, precio_2_num)
                     
-                if "$" in celda_precio or celda_precio.replace('.', '').isdigit():
-                    precio_num = limpiar_precio(celda_precio)
-                    
-                    if precio_num > 0:
-                        calidad = clasificar_calidad_skyphon(celda_prod)
-                        prod_limpio = celda_prod.replace("C/M", "CON MARCO").replace("c/m", "CON MARCO")
+                    # Si detectamos un precio válido, confirmamos que esto es un repuesto
+                    if precio_final > 0:
+                        prod_upper = celda_prod.upper()
+                        nombre_base = celda_prod
+                        
+                        # 🔋 INYECTOR DE CONTEXTO POR HOJA (Tapas y Baterías)
+                        if "TAPA" in hoja_upper and "TAPA" not in prod_upper:
+                            nombre_base = f"TAPA {celda_prod}"
+                        elif "BATERIA" in hoja_upper and "BATERIA" not in prod_upper and "BAT" not in prod_upper:
+                            nombre_base = f"BATERIA {celda_prod}"
+                            
+                        # 🚫 FILTRO DE BASURA MECÁNICA
+                        if "MECANICO" in nombre_base.upper() and not any(buena in nombre_base.upper() for buena in ["CROWN", "PREMIUM", "OLED"]):
+                            break # Rompemos el ciclo para ignorar esta fila completa
+                            
+                        calidad = clasificar_calidad_skyphon(nombre_base)
+                        prod_limpio = nombre_base.replace("C/M", "CON MARCO").replace("c/m", "CON MARCO")
                         prod_limpio = re.sub(r'(?i)/?MECANICO/?', ' ', prod_limpio).strip()
                         
-                        nombre_final = f"[CALIDAD: {calidad}] {prod_limpio} - SKYPHON"
+                        nombre_consolidado = f"[CALIDAD: {calidad}] {prod_limpio} - SKYPHON"
                         
                         producto_db = {
                             "client_id": "proveedor_skyphon",
-                            "nombre_consolidado": nombre_final,
-                            "precio": precio_num,
+                            "nombre_consolidado": nombre_consolidado,
+                            "precio": precio_final,
                             "stock": 99
                         }
                         lote_total.append(producto_db)
-                            
+                        
+                        # 🛑 Frenamos el escaneo horizontal en esta fila porque ya encontramos el repuesto
+                        break
+                        
         lote_unico = {p['nombre_consolidado']: p for p in lote_total}.values()
         
         if lote_unico:
             print(f"\n📦 Extracción completa. {len(lote_unico)} repuestos listos de Skyphon.")
             supabase.table("productos").delete().eq("client_id", "proveedor_skyphon").execute()
-            supabase.table("productos").insert(list(lote_unico)).execute()
+            
+            # 🔥 SUBIDA EN CAJAS DE 500
+            lista_final = list(lote_unico)
+            tamanio_lote = 500
+            for i in range(0, len(lista_final), tamanio_lote):
+                caja = lista_final[i : i + tamanio_lote]
+                supabase.table("productos").insert(caja).execute()
+                print(f"   -> Subida caja {i//tamanio_lote + 1}: {len(caja)} repuestos.")
+                
             print("✅ Catálogo de Skyphon subido a Supabase exitosamente.")
         else:
             print("⚠️ No se encontraron productos con formato válido para extraer.")
