@@ -25,8 +25,6 @@ supabase: Client = create_client(
 # Inicializamos la memoria global
 memoria_global = MemorySaver()
 
-
-
 def obtener_fecha_actual():
     # Esto le dice a Gaspar exactamente qué día y hora es en Argentina
     return datetime.datetime.now().strftime("%A, %d de %m de %Y, %H:%M hs")
@@ -181,16 +179,7 @@ def compilar_cerebro(client_id: str):
         buscar_costo_repuesto_real 
     ]
     
-    # 1. Traemos las instrucciones completas
-    instrucciones = obtener_instrucciones_seguras(client_id)
-    
-    # 2. 🔥 LA MAGIA DE AHORRO: Se lo pasamos directo al 'state_modifier'
-    agente = create_react_agent(
-        llm, 
-        herramientas, 
-        checkpointer=memoria_global,
-        messages_modifier=instrucciones
-    )
-    
+    agente = create_react_agent(llm, herramientas, checkpointer=memoria_global)
+
     
     return agente

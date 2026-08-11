@@ -202,12 +202,12 @@ def recuperar_historial_chatwoot(conversation_id: str):
 def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_id: str, usuario_meta: str = "", red_social: str = ""):
     print(f"🧠 Gaspar está pensando la respuesta para {sender_id}...")
     
-    try:
-        # 🔥 CORRECCIÓN CRÍTICA: Le decimos al cerebro que somos "3g_servicio"
+    try:        
         agente = compilar_cerebro("3g_servicio") 
+        instrucciones = obtener_instrucciones_seguras("3g_servicio")
         
-        # 🔥 EL HISTORIAL ARRANCA LIMPIO (Las reglas ya están inyectadas nativamente)
-        historial = []
+        # 🔥 INYECTAMOS CON ID FIJO: Así no gasta tokens de más
+        historial = [SystemMessage(content=instrucciones, id="instrucciones_base_unicas")]
         
         # 🔥 RECUPERACIÓN DE MEMORIA ANTI-AMNESIA DE RENDER
         if conversation_id not in sesiones_hidratadas:
