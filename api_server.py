@@ -206,10 +206,12 @@ def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_
         agente = compilar_cerebro(sender_id)
         instrucciones = obtener_instrucciones_seguras("3g_servicio")
         
-        historial = [SystemMessage(content=instrucciones, id="instrucciones_base_unicas")] 
+            # 🔥 EL HISTORIAL AHORA ARRANCA LIMPIO (Las reglas ya están en el state_modifier)
+        historial = []
+        
         # 🔥 RECUPERACIÓN DE MEMORIA ANTI-AMNESIA DE RENDER
         if conversation_id not in sesiones_hidratadas:
-            print(f"🔄 Render despertó. Inyectando historial de Chatwoot para la charla {conversation_id}...")
+            print(f"🔄 Render despertó. Inyectando historial de Chatwoot...")
             mensajes_viejos = recuperar_historial_chatwoot(conversation_id)
             
             # Evitamos duplicar el mensaje actual si Chatwoot ya lo incluyó en el historial descargado

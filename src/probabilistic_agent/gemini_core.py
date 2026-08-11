@@ -112,7 +112,7 @@ def obtener_instrucciones_seguras(client_id: str) -> str:
     2. MODELOS GENÉRICOS O INVÁLIDOS: Si te dicen una marca genérica, no des vueltas. Dile: "De esa marca vienen un montón de modelos, me confirmás cuál es el tuyo exactamente?". Pídele que mire en Configuración > Acerca del teléfono.
     3. EL CLIENTE NO ES TÉCNICO: NUNCA menciones "Mecánico", "OLED Small", "HD+", "FHD".
     {reglas_calidad_especificas}
-    5. PREGUNTA MODELO EXACTO: Si hay dudas (ej: A05 vs A05s), pregunta cuál de los dos es sin vueltas.
+    5. MODELOS CON VARIANTES (4G/5G): Muchos modelos de Samsung (Ej: A32, A22, A13, A14) y Motorola (Moto G) tienen versiones 4G y 5G que usan repuestos de precios TOTALMENTE DISTINTOS. ANTES de buscar un precio en tu sistema, TIENES LA OBLIGACIÓN de preguntarle al cliente: "Sabés si tu modelo es la versión 4G o 5G?". Jamás asumas una versión por tu cuenta.
     6. EL FACTOR COLOR: SOLO SI en las opciones del sistema ves "Blanco" o "Negro", pregunta el color. Si no, PROHIBIDO preguntar.
     7. EQUIPOS MOJADOS (¡ALERTA ROJA!): Si el cliente menciona que el equipo se mojó, cayó al agua, inodoro, etc., TIENES PROHIBIDO dar un precio o diagnóstico. Responde exactamente esto: "A los equipos mojados no los podemos cotizar por acá porque hay que abrirlos. Tenés que traerlo URGENTE al local para hacerle un baño químico y ver qué se salvó (tratá de no enchufarlo). Pasate lo antes posible."
     8. DESBLOQUEOS Y CUENTAS: Si el cliente pregunta por desbloquear iCloud, sacar cuentas de Google (FRP), o liberar red, NO des precios ni promesas. Derivalo ágilmente: "Ese tipo de trabajos de software los vemos directamente en el local porque tenemos que enchufarlo a la compu para ver qué seguridad tiene. Pasate y lo miramos."
@@ -130,7 +130,7 @@ def obtener_instrucciones_seguras(client_id: str) -> str:
     - IMPORTANTE: Debes incluir SIEMPRE al final de esta respuesta la etiqueta secreta: [ASISTENCIA_HUMANA]
 
     FORMATO DE COTIZACIÓN ESPERADO:
-    AHORA SIEMPRE DARÁS UNA SOLA OPCIÓN por defecto (la primera que te pase el sistema) usando este molde exacto, sin rellenar con frases largas antes ni después:
+    AHORA SIEMPRE DARÁS UNA SOLA OPCIÓN por defecto (la primera que te pase el sistema) usando este molde exacto, en estricto español. Cópialo tal cual:
     
     Para ese modelo el arreglo te queda en:
     Efectivo: $[Efectivo]
@@ -141,13 +141,13 @@ def obtener_instrucciones_seguras(client_id: str) -> str:
     Reservando el turno podés esperarlo acá en el local mientras reparamos tu cel, o sino te invitamos el café en Bonafide acá a 3 cuadras. ☕
 
     📍 REGLA DE UBICACIÓN (SÓLO PARA EL PRIMER PRESUPUESTO):
-    Si es la PRIMERA VEZ en la conversación que le pasas un precio a este cliente, OBLIGATORIAMENTE debes sumar un globo extra con la dirección. Para separarlo en un nuevo mensaje, debes usar el símbolo "||" al final del texto anterior, de esta manera exacta:
+    La PRIMERA VEZ en toda la conversación que le pasas un precio a un cliente, OBLIGATORIAMENTE debes agregar la dirección usando el símbolo "||" para separarlo en un mensaje nuevo.
+    TIENES ESTRICTAMENTE PROHIBIDO enviar la dirección en presupuestos futuros al mismo cliente.
+    El bloque exacto que debes pegar al final es este:
     ||
     Estamos en Córdoba Capital, sobre la calle La Rioja 126.
     Te dejo el link de Google Maps para que llegues:
-    https://maps.app.goo.gl/Z87j5ydqPvjWtUwdA
-
-    ⚠️ ATENCIÓN: Si el cliente luego te pide cotizar otro equipo distinto en la misma conversación, dale el nuevo precio normalmente pero TIENES PROHIBIDO volver a enviar el bloque de la dirección.
+    https://maps.app.goo.gl/Z87j5ydqPvjWtUwdA 
     """
 
 # Acordate de importar la función nueva al principio de gemini_core.py:
@@ -171,7 +171,7 @@ def agendar_turno(nombre_cliente: str, equipo_y_falla: str, fecha_hora_iso: str)
 def compilar_cerebro(client_id: str):
     """Ensambla el Agente."""
     llm = ChatGoogleGenerativeAI(
-        model="gemini-3.5-flash",
+        model="gemini-3.5-flash", # ¡Lo dejamos como lo tenías!
         temperature=0.3,
     )
     
@@ -181,8 +181,19 @@ def compilar_cerebro(client_id: str):
         buscar_costo_repuesto_real 
     ]
     
-    agente = create_react_agent(llm, herramientas, checkpointer=memoria_global)
-    prompts_por_agente[id(agente)] = obtener_instrucciones_seguras(client_id)
+    # 1. Traemos las instrucciones completas
+    instrucciones = obtener_instrucciones_seguras(client_id)
+    
+    # 2. 🔥 LA MAGIA DE AHORRO: Se lo pasamos directo al 'state_modifier'
+    agente = create_react_agent(
+        llm, 
+        herramientas, 
+        checkpointer=memoria_global,
+        state_modifier=instrucciones # LangGraph ahora lo maneja nativamente sin duplicarlo
+    )
+    
+    # (Opcional) Lo seguimos guardando en tu diccionario por si lo necesitas leer desde otro lado
+    prompts_por_agente[id(agente)] = instrucciones
     
     return agente
 
