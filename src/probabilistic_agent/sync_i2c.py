@@ -101,10 +101,40 @@ def buscar_en_i2c(modelo_cliente: str, tipo_repuesto: str):
                     break
                     
             precio_num = extraer_precio_numerico(precio_texto)
-            
-            # MAGIA: Quitamos tildes y pasamos a mayúsculas para comparar siempre limpio
             titulo_limpio = quitar_tildes(titulo_original).upper()
             
+            # 🔥 NUEVO FILTRO ESTRICTO (El mismo que usamos en Supabase)
+            # Limpiamos el título de la web y lo separamos por palabras
+            nombre_pad = f" {titulo_limpio.replace('/', ' ').replace('-', ' ').replace('(', ' ').replace(')', ' ')} "
+            modelo_limpio_arr = modelo_cliente.upper().split()
+            coincide_todo = True
+            
+            for t in modelo_limpio_arr:
+                t_str = str(t).strip()
+                if not t_str: continue
+                variantes_termino = [t_str]
+                
+                # Expansión inteligente (ej: J6 -> J06, G5 -> G05)
+                if len(t_str) == 2 and t_str[0].isalpha() and t_str[1].isdigit():
+                    variantes_termino.append(f"{t_str[0]}0{t_str[1]}") 
+                elif len(t_str) == 3 and t_str[0].isalpha() and t_str[1] == '0' and t_str[2].isdigit():
+                    variantes_termino.append(f"{t_str[0]}{t_str[2]}") 
+                    
+                encontrado = False
+                for variante in variantes_termino:
+                    if f" {variante} " in nombre_pad:
+                        encontrado = True
+                        break 
+                        
+                if not encontrado:
+                    coincide_todo = False
+                    break
+                    
+            # MAGIA: Si la web devolvió un producto que NO ES el modelo pedido (Ej: J6 Plus), se salta y se ignora.
+            if not coincide_todo:
+                continue
+
+            # === SI PASÓ EL CONTROL DE ADUANA, RECIÉN ACÁ LO CLASIFICAMOS ===
             if tipo_repuesto == "pantalla":
                 # 🚫 FILTRO ASESINO PARA I2C (IGNORAR MECÁNICOS)
                 if "MECANICO" in titulo_limpio and not any(buena in titulo_limpio for buena in ["CROWN", "PREMIUM", "OLED"]):
