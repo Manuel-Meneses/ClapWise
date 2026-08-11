@@ -153,48 +153,46 @@ def asignar_agente_chatwoot(conversation_id: str, agente_id: int = 0):
         print(f"🚨 Excepción asignando agente: {e}")
 
 def recuperar_historial_chatwoot(conversation_id: str):
-    """Va a buscar los últimos mensajes a Chatwoot, los formatea para LangChain
-       y les INYECTA LA FECHA Y HORA para que la IA no pierda la noción del tiempo."""
+    """Va a buscar los últimos mensajes a Chatwoot y los formatea como un resumen de contexto seguro para el Agente."""
     url = f"{CHATWOOT_URL}/api/v1/accounts/{ACCOUNT_ID}/conversations/{conversation_id}/messages"
     headers = {
         "api_access_token": API_TOKEN,
         "Content-Type": "application/json"
     }
-    historial_lc = []
+    
+    historial_texto = "[HISTORIAL DE CHARLA PREVIA RECUPERADO]\n"
+    mensajes_validos = 0
     
     try:
         respuesta = req.get(url, headers=headers)
         if respuesta.status_code == 200:
             mensajes = respuesta.json().get("payload", [])
             
-            # Invertimos para que queden en orden cronológico, tomando solo los últimos 10
-            for msg in reversed(mensajes[:10]):
+            # Traemos los últimos 15 para tener buen contexto
+            for msg in reversed(mensajes[:15]): 
                 es_privado = msg.get("private", False)
                 tipo = msg.get("message_type")
                 contenido = msg.get("content")
                 
-                # 🔥 TRUCO DEL TIEMPO: Extraemos el timestamp de Chatwoot
-                timestamp_unix = msg.get("created_at")
-                fecha_hora_texto = ""
-                
-                if timestamp_unix:
-                    # Convertimos el número de Chatwoot a una hora legible de Argentina (UTC-3)
-                    dt = datetime.fromtimestamp(timestamp_unix, timezone.utc) - timedelta(hours=3)
-                    fecha_hora_texto = f" [Enviado el {dt.strftime('%d/%m a las %H:%M')}]"
-                
                 if contenido and not es_privado:
                     if tipo == 0:  # Cliente
-                        # Le pegamos la fecha y hora al final del texto del cliente
-                        historial_lc.append(HumanMessage(content=f"{contenido}{fecha_hora_texto}"))
+                        historial_texto += f"Cliente: {contenido}\n"
+                        mensajes_validos += 1
                     elif tipo == 1:  # Bot o Joa
-                        # Evitamos que el bot lea sus propias alertas de sistema o derivaciones
+                        # Evitamos que lea alertas o derivaciones
                         if "🛑" not in contenido and "[ASISTENCIA_HUMANA]" not in contenido:
-                            # Le pegamos la fecha y hora al final del texto del bot/Joa
-                            historial_lc.append(AIMessage(content=f"{contenido}{fecha_hora_texto}"))
+                            historial_texto += f"Gaspar: {contenido}\n"
+                            mensajes_validos += 1
+                            
     except Exception as e:
         print(f"🚨 Error recuperando memoria de Chatwoot: {e}")
         
-    return historial_lc
+    if mensajes_validos > 0:
+        # Lo inyectamos como UN SOLO mensaje de contexto humano. Así el bot no se buggea intentando buscar las herramientas.
+        historial_texto += "--- FIN DEL HISTORIAL PREVIO ---\n(Instrucción oculta de sistema: Lee este historial para tener contexto de qué hablaron. NO repitas precios antiguos y NO vuelvas a enviar la dirección de Google Maps si ya figura acá arriba)."
+        return [HumanMessage(content=historial_texto)]
+        
+    return []
 
 # ========================================================
 # 🧠 TAREA DE FONDO (Procesa con Gemini y responde)
@@ -214,11 +212,10 @@ def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_
             print(f"🔄 Render despertó. Inyectando historial de Chatwoot...")
             mensajes_viejos = recuperar_historial_chatwoot(conversation_id)
             
-            # Evitamos duplicar el mensaje actual si Chatwoot ya lo incluyó en el historial descargado
-            if mensajes_viejos and isinstance(mensajes_viejos[-1], HumanMessage) and mensajes_viejos[-1].content.strip() == texto_cliente.strip():
-                mensajes_viejos.pop()
+            # Simplemente agregamos el bloque de texto si existe, sin usar pop()
+            if mensajes_viejos:
+                historial.extend(mensajes_viejos)
                 
-            historial.extend(mensajes_viejos)
             sesiones_hidratadas.add(conversation_id)
             print("✅ Historial inyectado con éxito.")
             
@@ -226,7 +223,7 @@ def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_
             nota_oculta = f"\n\n(Nota del sistema: El cliente te escribe desde {red_social} y su usuario es @{usuario_meta}. Asegurate de agregar este @usuario en la descripción del evento al agendar el turno)."
             texto_cliente = texto_cliente + nota_oculta
             
-        # Agregamos el mensaje actual del cliente
+        # Agregamos el mensaje actual del cliente al final
         historial.append(HumanMessage(content=texto_cliente))
         
         config_memoria = {"configurable": {"thread_id": str(sender_id)}}
