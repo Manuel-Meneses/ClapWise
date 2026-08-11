@@ -12,7 +12,6 @@ from src.probabilistic_agent.google_calendar import insertar_evento_turno
 # Importación de herramientas
 from src.probabilistic_agent.system_tools import (
     generar_link_pago, 
-    solicitar_asistencia_humana,
     buscar_costo_repuesto_real 
 )
 
@@ -178,9 +177,7 @@ def compilar_cerebro(client_id: str):
     
     herramientas = [
         agendar_turno,
-        consultar_inventario_local,
         generar_link_pago,
-        solicitar_asistencia_humana,
         buscar_costo_repuesto_real 
     ]
     
