@@ -27,6 +27,9 @@ mensajes_enviados_por_bot = []
 # Guarda las sesiones a las que ya se les curó la amnesia
 sesiones_hidratadas = set()
 
+mensajes_buffer = {}
+temporizadores_buffer = {}
+
 # ========================================================
 # ⚙️ CONFIGURACIÓN DEL RELOJ AUTOMÁTICO
 # ========================================================
@@ -195,7 +198,7 @@ def recuperar_historial_chatwoot(conversation_id: str):
 # 🧠 TAREA DE FONDO (Procesa con Gemini y responde)
 # ========================================================
 def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_id: str, usuario_meta: str = "", red_social: str = ""):
-    print(f"🧠 Gaspar está pensando la respuesta para {sender_id}...")
+    print(f"🧠 Gaspar está pensando la respuesta...")
     
     try:
         agente = compilar_cerebro(sender_id)
@@ -203,12 +206,11 @@ def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_
         
         historial = [SystemMessage(content=instrucciones)]
         
-        # 🔥 RECUPERACIÓN DE MEMORIA ANTI-AMNESIA DE RENDER
+        # Inyectamos el historial completo de Chatwoot si es la primera interacción tras el reinicio
         if conversation_id not in sesiones_hidratadas:
-            print(f"🔄 Render despertó. Inyectando historial de Chatwoot para la charla {conversation_id}...")
+            print(f"🔄 Inyectando historial de Chatwoot para la charla {conversation_id}...")
             mensajes_viejos = recuperar_historial_chatwoot(conversation_id)
             
-            # Evitamos duplicar el mensaje actual si Chatwoot ya lo incluyó en el historial descargado
             if mensajes_viejos and isinstance(mensajes_viejos[-1], HumanMessage) and mensajes_viejos[-1].content.strip() == texto_cliente.strip():
                 mensajes_viejos.pop()
                 
@@ -216,12 +218,10 @@ def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_
             sesiones_hidratadas.add(conversation_id)
             print("✅ Historial inyectado con éxito.")
             
-        
         if usuario_meta:
             nota_oculta = f"\n\n(Nota del sistema: El cliente te escribe desde {red_social} y su usuario es @{usuario_meta}. Asegurate de agregar este @usuario en la descripción del evento al agendar el turno)."
             texto_cliente = texto_cliente + nota_oculta
             
-        # Agregamos el mensaje actual del cliente
         historial.append(HumanMessage(content=texto_cliente))
         
         config_memoria = {"configurable": {"thread_id": str(sender_id)}}
@@ -240,38 +240,24 @@ def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_
         else:
             respuesta_final = str(contenido)
         
-        # 👇 LÓGICA DE DERIVACIÓN (Precios Altos, Modelos Raros)
         if "[ASISTENCIA_HUMANA]" in respuesta_final:
             print(f"⚠️ Gaspar solicitó derivar la conversación {conversation_id} a Joa.")
-            
-            # 1. Limpiamos etiqueta y mandamos mensaje al cliente
             respuesta_limpia = respuesta_final.replace("[ASISTENCIA_HUMANA]", "").strip()
             enviar_mensaje_chatwoot(conversation_id, respuesta_limpia)
-            
-            # 2. Apagamos el bot automáticamente para esta charla
             conversaciones_pausadas[conversation_id] = True
-            
-            # 3. Alertas visuales para Joa en Chatwoot
             cambiar_estado_chatwoot(conversation_id, status="open")
-            # 🔥 ETIQUETA DERIVACIÓN BOT
             agregar_etiqueta_chatwoot(conversation_id, "derivado_bot")
-            # 🔥 ACÁ DERIVAMOS A TODOS LOS AGENTES (Bandeja general)
             asignar_agente_chatwoot(conversation_id, agente_id=0) 
-            
             enviar_mensaje_chatwoot(conversation_id, "🛑 BOT PAUSADO: Gaspar derivó esta consulta. Revisá el historial arriba y tomá el control. (Para reactivarlo escribe /activar)", es_privado=True)
             
         else:
-            # 🔥 Sistema de múltiples burbujas (Saltos en WhatsApp) 🔥
             print(f"✅ Respuesta normal procesada para {conversation_id}")
-            
-            # Cortamos la respuesta gigante cada vez que encontremos "||"
             burbujas = respuesta_final.split("||")
-            
             for burbuja in burbujas:
                 texto_burbuja = burbuja.strip()
-                if texto_burbuja:  # Verificamos que no esté vacío
+                if texto_burbuja:
                     enviar_mensaje_chatwoot(conversation_id, texto_burbuja)
-                    time.sleep(4)  # Pausa de 4 segundos entre cada globito
+                    time.sleep(4)
 
     except Exception as e:
         import traceback
@@ -289,100 +275,110 @@ async def recibir_mensaje_chatwoot(request: Request, background_tasks: Backgroun
         message_type = body.get("message_type")
         conversation_id = str(body.get("conversation", {}).get("id", ""))
         
-        # ----------------------------------------------------
-        # 🛡️ VÁLVULA DE SEGURIDAD 1: FILTRO ANTI-GRUPOS DE WHATSAPP
-        # ----------------------------------------------------
         sender_phone = str(body.get("sender", {}).get("phone_number", ""))
         sender_identifier = str(body.get("sender", {}).get("identifier", ""))
         
-        # Eliminamos el bloqueo por guion ("-") porque Chatwoot usa UUIDs con guiones para clientes normales.
         if "@g.us" in sender_phone or "@g.us" in sender_identifier:
-            print(f"🤫 [FILTRO GRUPOS] Mensaje de grupo detectado en la charla {conversation_id}. Ignorando.")
             return {"status": "ok"}
             
-        # ----------------------------------------------------
-        # 1. CONTROL DE PAUSA MANUAL POR JOA (Notas Privadas)
-        # ----------------------------------------------------
         if event == "message_created" and message_type == "outgoing" and body.get("private") == True:
             comando = body.get("content", "").strip().lower()
-            
             if comando == "/pausa":
                 conversaciones_pausadas[conversation_id] = True
-                print(f"🛑 Joa pausó el bot manualmente en la charla {conversation_id}")
                 enviar_mensaje_chatwoot(conversation_id, "✅ Bot pausado. Ahora tienes el control total.", es_privado=True)
                 return {"status": "ok"}
-                
             elif comando == "/activar":
                 conversaciones_pausadas.pop(conversation_id, None)
-                print(f"▶️ Joa reactivó el bot en la charla {conversation_id}")
                 enviar_mensaje_chatwoot(conversation_id, "✅ Bot reactivado. Gaspar responderá el próximo mensaje del cliente.", es_privado=True)
                 return {"status": "ok"}
 
-        
-        # ----------------------------------------------------
-        # 2. AUTO-PAUSA POR USO DE PLANTILLAS Y MACROS (FILTRO NINJA MEJORADO)
-        # ----------------------------------------------------
         if event == "message_created" and message_type == "outgoing":
             contenido = body.get("content", "").strip()
-            
-            # 🔥 CONTROL NINJA MEJORADO: Búsqueda flexible
             fue_gaspar = False
             for msg_guardado in mensajes_enviados_por_bot:
-                # Comparamos si una parte del texto coincide (ignora espacios fantasmas de Chatwoot)
                 if contenido in msg_guardado or msg_guardado in contenido:
                     fue_gaspar = True
                     mensajes_enviados_por_bot.remove(msg_guardado)
                     break
-                    
             if not fue_gaspar:
-                # Si definitivamente no fue Gaspar y NO es una nota amarilla... ¡Fue Joa!
                 if not body.get("private"):
                     if not conversaciones_pausadas.get(conversation_id):
-                        print(f"🤖 Auto-pausa: Joa tomó el control en la charla {conversation_id}")
                         conversaciones_pausadas[conversation_id] = True
                         enviar_mensaje_chatwoot(conversation_id, "🛑 BOT PAUSADO AUTOMÁTICAMENTE: Detecté que tomaste el control de la charla o enviaste una plantilla. (Para que vuelva el bot escribe /activar)", es_privado=True)
         
-        # ----------------------------------------------------
-        # 3. PROCESAMIENTO DE MENSAJES DEL CLIENTE
-        # ----------------------------------------------------
         if event == "message_created" and message_type == "incoming":
-            
-            # A) Si el bot está pausado para esta charla, ignoramos el mensaje
             if conversaciones_pausadas.get(conversation_id):
-                print(f"🤫 Bot silenciado para charla {conversation_id}. Ignorando mensaje.")
                 return {"status": "ok"}
                 
-            # B) Filtro Anti-Fotos/Audios
             adjuntos = body.get("attachments", [])
             if adjuntos:
-                print(f"📸 El cliente envió un archivo en {conversation_id}. Derivando a Joa...")
                 conversaciones_pausadas[conversation_id] = True
                 enviar_mensaje_chatwoot(conversation_id, "Recibí el archivo. Dame un ratito que se lo paso a los chicos del taller para que lo vean y te digo.")
                 cambiar_estado_chatwoot(conversation_id, status="open")
-                # 🔥 ETIQUETA ARCHIVO RECIBIDO
                 agregar_etiqueta_chatwoot(conversation_id, "archivo_recibido")
-                # 🔥 ACÁ DERIVAMOS A TODOS LOS AGENTES (Bandeja general)
                 asignar_agente_chatwoot(conversation_id, agente_id=0) 
                 enviar_mensaje_chatwoot(conversation_id, "🛑 BOT PAUSADO AUTOMÁTICAMENTE: El cliente envió un archivo.", es_privado=True)
                 return {"status": "ok"}
             
-            # C) Si es texto normal y el bot NO está pausado, llamamos a Gemini
+            # ----------------------------------------------------
+            # 🔥 SALA DE ESPERA (7 SEGS) + SUSURRO ANTI-CONFUSIÓN
+            # ----------------------------------------------------
             texto_cliente = body.get("content", "")
             sender_id = str(body.get("sender", {}).get("id", ""))
             
-            # 🔥 EXTRAEMOS EL USUARIO DE INSTAGRAM/FACEBOOK (El handle)
             atributos = body.get("sender", {}).get("additional_attributes", {})
             usuario_meta = atributos.get("username") or atributos.get("screen_name") or ""
             red_social = body.get("inbox", {}).get("name", "Chat")
             
             if texto_cliente and conversation_id:
-                print(f"\n📩 [Chatwoot] Mensaje de {sender_id}: {texto_cliente}")
-                # Le pasamos el usuario_meta y la red_social a la tarea de fondo
-                background_tasks.add_task(procesar_y_responder_fondo, texto_cliente, sender_id, conversation_id, usuario_meta, red_social)
+                print(f"\n📩 [Chatwoot] Mensaje retenido en sala de espera: {texto_cliente}")
+                
+                # 1. Calculamos cuánto tiempo pasó desde la última charla
+                ahora = datetime.now()
+                ultima_vez = ultima_interaccion.get(conversation_id)
+                
+                nota_tiempo = ""
+                if ultima_vez and (ahora - ultima_vez > timedelta(hours=2)):
+                    print(f"🕒 Pasaron más de 2 horas. Preparando susurro de contexto para {conversation_id}.")
+                    nota_tiempo = "\n\n(Nota oculta del sistema: Inicia un nuevo día o sesión. Responde SOLO a lo que el cliente pregunte ahora. Tienes PROHIBIDO mencionar proactivamente presupuestos o faltas de stock de celulares que se hablaron ayer o hace horas, a menos que el cliente te pregunte por ellos de nuevo.)\n\n"
+                
+                # Actualizamos el reloj
+                ultima_interaccion[conversation_id] = ahora
+                
+                # Si llega un nuevo mensaje del mismo cliente rápido, reiniciamos el reloj de 7 segs
+                if conversation_id in temporizadores_buffer:
+                    temporizadores_buffer[conversation_id].cancel()
+                    
+                if conversation_id in mensajes_buffer:
+                    mensajes_buffer[conversation_id].append(texto_cliente)
+                else:
+                    mensajes_buffer[conversation_id] = [texto_cliente]
+                    
+                async def esperar_y_procesar(conv_id, s_id, u_meta, r_social, susurro):
+                    try:
+                        # ⏳ Espera 7 segundos a que el cliente termine de tipear todo
+                        await asyncio.sleep(7) 
+                        
+                        textos = mensajes_buffer.pop(conv_id, [])
+                        if textos:
+                            mensaje_unido = "\n".join(textos)
+                            
+                            # Si es el primer mensaje después de mucho tiempo, le pegamos el susurro al principio
+                            if susurro:
+                                mensaje_unido = susurro + mensaje_unido
+                                
+                            print(f"📦 Paquete completo enviado a Gaspar: '{mensaje_unido}'")
+                            
+                            await asyncio.to_thread(procesar_y_responder_fondo, mensaje_unido, s_id, conv_id, u_meta, r_social)
+                    except asyncio.CancelledError:
+                        pass # Entró otro mensaje antes de los 7s, se cancela esta tarea y la nueva toma el control
+                        
+                task = asyncio.create_task(esperar_y_procesar(conversation_id, sender_id, usuario_meta, red_social, nota_tiempo))
+                temporizadores_buffer[conversation_id] = task
                 
         return {"status": "ok"}
         
     except Exception as e:
         import traceback
         print(f"🚨 Error leyendo Webhook de Chatwoot: {traceback.format_exc()}")
-        return {"status": "error"}
+        return {"status": "error"} 
