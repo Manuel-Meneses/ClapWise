@@ -88,19 +88,27 @@ def buscar_en_i2c(modelo_cliente: str, tipo_repuesto: str):
         for etiqueta in etiquetas_a:
             texto_crudo = etiqueta.get_text(separator="|", strip=True)
             
-            if "$" not in texto_crudo:
-                continue
+            # ELIMINAMOS el: if "$" not in texto_crudo: continue
                 
             partes = texto_crudo.split("|")
             titulo_original = partes[0].strip() 
             
             precio_texto = "0"
             for parte in partes:
-                if "$" in parte:
+                # Limpiamos puntos y comas para ver si es un número puro
+                parte_limpia = parte.replace('.', '').replace(',', '').strip()
+                
+                # Si tiene el $ o si es un número largo (ej: 04320)
+                if "$" in parte or (parte_limpia.isdigit() and len(parte_limpia) >= 4):
                     precio_texto = parte
                     break
                     
             precio_num = extraer_precio_numerico(precio_texto)
+            
+            # Ahora sí, si el precio extraído es inválido o 0, lo descartamos
+            if precio_num <= 0:
+                continue
+
             titulo_limpio = quitar_tildes(titulo_original).upper()
             
             # 🔥 NUEVO FILTRO ESTRICTO (El mismo que usamos en Supabase)
