@@ -206,8 +206,7 @@ def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_
         agente = compilar_cerebro(sender_id)
         instrucciones = obtener_instrucciones_seguras("3g_servicio")
         
-        historial = [SystemMessage(content=instrucciones)]
-        
+        historial = [SystemMessage(content=instrucciones, id="instrucciones_base_unicas")] 
         # 🔥 RECUPERACIÓN DE MEMORIA ANTI-AMNESIA DE RENDER
         if conversation_id not in sesiones_hidratadas:
             print(f"🔄 Render despertó. Inyectando historial de Chatwoot para la charla {conversation_id}...")
