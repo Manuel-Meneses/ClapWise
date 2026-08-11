@@ -138,6 +138,7 @@ def obtener_instrucciones_seguras(client_id: str) -> str:
     Efectivo: $[Efectivo]
     Transferencia: $[Lista]
     Tarjeta: 3 cuotas de $[Valor Cuota]
+    Tarjeta: 6 cuotas de $[Valor Cuota 6]
 
     Reservando el turno podés esperarlo acá en el local mientras reparamos tu cel, o sino te invitamos el café en Bonafide acá a 3 cuadras. ☕
 

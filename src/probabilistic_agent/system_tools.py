@@ -101,8 +101,8 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
         # Descargar la NUEVA matriz de cálculo (Formato de Tramos)
         respuesta_matriz = supabase.table("configuracion_clientes").select("reglas_calculadora").eq("client_id", "matriz_calculo_interna").execute()
         
-        # Si no hay matriz cargada o hay error, usamos valores por defecto seguros
-        matriz_default = {"tramos": [], "descuento_efectivo": 0.15, "recargo_3_cuotas": 0.18}
+        # Si no hay matriz cargada o hay error, usamos valores por defecto seguros (AQUÍ SUMAMOS EL 6 CUOTAS)
+        matriz_default = {"tramos": [], "descuento_efectivo": 0.15, "recargo_3_cuotas": 0.18, "recargo_6_cuotas": 0.26}
         matriz_raw = respuesta_matriz.data[0]["reglas_calculadora"] if respuesta_matriz.data else json.dumps(matriz_default)
         matriz_data = json.loads(matriz_raw)
 
@@ -111,20 +111,31 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
             tramos = matriz_data.get("tramos", [])
             dto = matriz_data.get("descuento_efectivo", 0.15)
             rec = matriz_data.get("recargo_3_cuotas", 0.18)
+            rec_6 = matriz_data.get("recargo_6_cuotas", 0.26) # <- Agregamos lectura de 6 cuotas
             
+            # ESCUDO PARA I2C: Nos aseguramos de que el costo base sea un número y no un texto
+            try:
+                if isinstance(costo_base, str):
+                    costo_num = float(costo_base.replace('$', '').replace(' ', '').replace(',', '').strip())
+                else:
+                    costo_num = float(costo_base)
+            except:
+                costo_num = 0.0
+
             monto_a_sumar = 35000 # Valor base por si el costo no cae en ningún tramo
             
-            # Buscamos en qué escalón cae el repuesto
+            # Buscamos en qué escalón cae el repuesto usando el costo numérico
             for tramo in tramos:
-                if tramo["desde"] <= costo_base <= tramo["hasta"]:
+                if tramo["desde"] <= costo_num <= tramo["hasta"]:
                     monto_a_sumar = tramo["sumar"]
                     break
                     
-            lista = costo_base + monto_a_sumar
+            lista = costo_num + monto_a_sumar
             efectivo = lista * (1 - dto)
             tarjeta = lista * (1 + rec)
+            tarjeta_6 = lista * (1 + rec_6) # <- Calculamos el total de 6 cuotas
             
-            return int(lista), int(efectivo), int(tarjeta), int(tarjeta / 3)
+            return int(lista), int(efectivo), int(tarjeta), int(tarjeta / 3), int(tarjeta_6), int(tarjeta_6 / 6)
 
         # 2. 🧠 LIMPIEZA DE MARCAS (Soluciona que el proveedor no escriba "Moto")
         marcas_a_ignorar = ["SAMSUNG", "MOTOROLA", "MOTO", "XIAOMI", "APPLE", "IPHONE", "LG", "NOKIA"]
@@ -277,7 +288,8 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
             
         opciones_texto = ""
         for i, r in enumerate(mejores_opciones): 
-            lista, efectivo, tarjeta, cuota = aplicar_calculadora(r['precio'])
+            # AQUÍ AHORA RECIBIMOS LAS 6 VARIABLES
+            lista, efectivo, tarjeta, cuota, tarjeta_6, cuota_6 = aplicar_calculadora(r['precio'])
             
             # 🚨 REGLA DE JOA: LÍMITE DE $300.000 🚨
             if efectivo >= 300000 or lista >= 300000:
@@ -285,7 +297,8 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
                 INSTRUCCIÓN IA: TIENES PROHIBIDO DAR EL PRECIO. Dile ágilmente al cliente: 'Che, te cuento que ese repuesto es de alta gama. Ahí te derivo con uno de mis compañeros para que te arme una cotización a medida.'
                 OBLIGATORIO: Agrega al final de tu respuesta la etiqueta secreta: [ASISTENCIA_HUMANA]"""
 
-            opciones_texto += f"Opción {i+1}: {r['nombre_consolidado']} -> EFVO: ${efectivo} | LISTA: ${lista} | TARJETA: ${tarjeta} (3 de ${cuota})\n"
+            # AQUÍ LE PASAMOS A GASPAR LA INFO DE LAS 6 CUOTAS EN EL MISMO FORMATO QUE TENÍAS
+            opciones_texto += f"Opción {i+1}: {r['nombre_consolidado']} -> EFVO: ${efectivo} | LISTA: ${lista} | TARJETA: ${tarjeta} (3 de ${cuota}) | TARJETA 6: ${tarjeta_6} (6 de ${cuota_6})\n"
         
         instruccion_final = """INSTRUCCIÓN IA: Aplica tu ESTRATEGIA DE VENTA DE PANTALLAS. 
         Ofrece SIEMPRE SOLO LA OPCIÓN 1 por defecto. No menciones marcas raras. 

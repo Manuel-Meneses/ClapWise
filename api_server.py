@@ -1,3 +1,4 @@
+import datetime
 import os
 import time
 import asyncio
@@ -12,6 +13,7 @@ from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from src.probabilistic_agent.sync_excel import sincronizar_calculadora
 from src.probabilistic_agent.sync_one_services import sincronizar_one_services
 from src.probabilistic_agent.gemini_core import compilar_cerebro, obtener_instrucciones_seguras
+from sync_mundo_parts import sincronizar_mundo_parts
 
 # ========================================================
 # 🧠 MEMORIA RAM DE PAUSAS Y CONTROL
@@ -35,9 +37,11 @@ async def lifespan(app: FastAPI):
     print("🔄 Forzando sincronización inicial al encender el servidor...")
     sincronizar_calculadora()
     sincronizar_one_services()
+    sincronizar_mundo_parts()
     
     scheduler.add_job(sincronizar_one_services, 'interval', hours=6)
     scheduler.add_job(sincronizar_calculadora, 'interval', hours=12) 
+    scheduler.add_job(sincronizar_mundo_parts, 'interval', hours=6)
     
     scheduler.start()
     yield
@@ -170,7 +174,7 @@ def recuperar_historial_chatwoot(conversation_id: str):
                 
                 if timestamp_unix:
                     # Convertimos el número de Chatwoot a una hora legible de Argentina (UTC-3)
-                    dt = datetime.fromtimestamp(timestamp_unix, timezone.utc) - timedelta(hours=3)
+                    dt = datetime.fromtimestamp(timestamp_unix, datetime.timezone.utc) - datetime.timedelta(hours=3)
                     fecha_hora_texto = f" [Enviado el {dt.strftime('%d/%m a las %H:%M')}]"
                 
                 if contenido and not es_privado:
