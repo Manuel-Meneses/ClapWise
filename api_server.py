@@ -243,38 +243,21 @@ def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_
         else:
             respuesta_final = str(contenido)
         
-        # 👇 LÓGICA DE DERIVACIÓN (Precios Altos, Modelos Raros)
-        if "[ASISTENCIA_HUMANA]" in respuesta_final:
-            print(f"⚠️ Gaspar solicitó derivar la conversación {conversation_id} a Joa.")
-            
-            # 1. Limpiamos etiqueta y mandamos mensaje al cliente
-            respuesta_limpia = respuesta_final.replace("[ASISTENCIA_HUMANA]", "").strip()
-            enviar_mensaje_chatwoot(conversation_id, respuesta_limpia)
-            
-            # 2. Apagamos el bot automáticamente para esta charla
-            conversaciones_pausadas[conversation_id] = True
-            
-            # 3. Alertas visuales para Joa en Chatwoot
-            cambiar_estado_chatwoot(conversation_id, status="open")
-            # 🔥 ETIQUETA DERIVACIÓN BOT
-            agregar_etiqueta_chatwoot(conversation_id, "derivado_bot")
-            # 🔥 ACÁ DERIVAMOS A TODOS LOS AGENTES (Bandeja general)
-            asignar_agente_chatwoot(conversation_id, agente_id=0) 
-            
-            enviar_mensaje_chatwoot(conversation_id, "🛑 BOT PAUSADO: Gaspar derivó esta consulta. Revisá el historial arriba y tomá el control. (Para reactivarlo escribe /activar)", es_privado=True)
-            
-        else:
-            # 🔥 Sistema de múltiples burbujas (Saltos en WhatsApp) 🔥
-            print(f"✅ Respuesta normal procesada para {conversation_id}")
-            
-            # Cortamos la respuesta gigante cada vez que encontremos "||"
-            burbujas = respuesta_final.split("||")
-            
-            for burbuja in burbujas:
-                texto_burbuja = burbuja.strip()
-                if texto_burbuja:  # Verificamos que no esté vacío
-                    enviar_mensaje_chatwoot(conversation_id, texto_burbuja)
-                    time.sleep(4)  # Pausa de 4 segundos entre cada globito
+        # 👇 LÓGICA DE DERIVACIÓN ELIMINADA
+        # Limpiamos la etiqueta por si Gaspar la sigue generando en su cerebro
+        respuesta_final = respuesta_final.replace("[ASISTENCIA_HUMANA]", "").strip()
+        
+        # 🔥 Sistema de múltiples burbujas (Saltos en WhatsApp) 🔥
+        print(f"✅ Respuesta normal procesada para {conversation_id}")
+        
+        # Cortamos la respuesta gigante cada vez que encontremos "||"
+        burbujas = respuesta_final.split("||")
+        
+        for burbuja in burbujas:
+            texto_burbuja = burbuja.strip()
+            if texto_burbuja:  # Verificamos que no esté vacío
+                enviar_mensaje_chatwoot(conversation_id, texto_burbuja)
+                time.sleep(4)  # Pausa de 4 segundos entre cada globito
 
     except Exception as e:
         import traceback
