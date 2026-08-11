@@ -189,7 +189,7 @@ def compilar_cerebro(client_id: str):
         llm, 
         herramientas, 
         checkpointer=memoria_global,
-        state_modifier=instrucciones # LangGraph ahora lo maneja nativamente sin duplicarlo
+        messages_modifier=instrucciones
     )
     
     
