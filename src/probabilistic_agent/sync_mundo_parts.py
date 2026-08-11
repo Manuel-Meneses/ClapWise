@@ -17,28 +17,39 @@ URL_GOOGLE_SHEETS = "https://docs.google.com/spreadsheets/d/1c39kYssBH8TWE4JPZ8c
 def limpiar_precio(precio_str):
     try:
         p_str = str(precio_str).strip()
+        if not p_str or p_str.lower() == 'nan': return 0.0
         
-        # Si tiene el símbolo de pesos, extraemos los números directo
-        if "$" in p_str:
-            limpio = re.sub(r'[^\d]', '', p_str)
-            return float(limpio)
+        # Sacamos el signo pesos si lo tiene
+        p_str = p_str.replace('$', '').strip()
         
-        # Si es un número puro desde Excel (Traductor Argentino)
-        try:
-            val = float(p_str)
-            # Si Python lee "3.5" (porque el Excel tenía 3.500), lo acomodamos a miles.
+        # 1. Si Pandas lo convirtió a float y le agregó un .0 falso (ej: 800 -> "800.0")
+        if p_str.endswith('.0'):
+            p_str = p_str[:-2]
+            
+        # 2. TRADUCTOR ARGENTINO: Si tiene un punto y después 3 números, es un separador de miles! (ej: "358.000")
+        if '.' in p_str and len(p_str.split('.')[-1]) == 3:
+            p_str = p_str.replace('.', '')
+            
+        # 3. Si llega a haber una coma de centavos, la pasamos a punto (ej: 1500,50 -> 1500.50)
+        p_str = p_str.replace(',', '.')
+        
+        # Extraemos solo lo que sea número y punto
+        limpio = re.sub(r'[^\d.]', '', p_str)
+        
+        if limpio:
+            val = float(limpio)
+            
+            # El traductor viejo por si siguen poniendo "45.5" en vez de 45500
             if 0 < val < 100:
                 val = val * 1000
+                
             return val
-        except ValueError:
-            limpio = re.sub(r'[^\d]', '', p_str)
-            if limpio:
-                return float(limpio)
-            return 0.0
             
+        return 0.0
+        
     except Exception:
         return 0.0
-
+    
 def quitar_tildes(texto):
     try:
         texto = str(texto)
