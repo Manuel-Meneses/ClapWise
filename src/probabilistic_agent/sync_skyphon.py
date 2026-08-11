@@ -32,7 +32,6 @@ def clasificar_calidad_skyphon(titulo_producto):
     titulo = quitar_tildes(titulo_producto).upper()
     calidad = "ESTÁNDAR"
     
-    # 1. Filtro base (SIN MECANICO)
     if "SERVICE PACK" in titulo or "ORIG" in titulo:
         calidad = "SERVICE PACK"
     elif "INCELL" in titulo:
@@ -42,7 +41,6 @@ def clasificar_calidad_skyphon(titulo_producto):
     elif "OLED" in titulo or "MODULO" in titulo or "PANTALLA" in titulo:
         calidad = "OLED"
         
-    # 2. Detector de Marcos
     if "C/M" in titulo or "CON MARCO" in titulo or "C/MARCO" in titulo:
         calidad += " CON MARCO"
         
@@ -64,28 +62,34 @@ def sincronizar_skyphon():
             
             for index, row in df.iterrows():
                 try:
-                    celda_prod = str(row.iloc[1]).strip()
-                    celda_precio = str(row.iloc[2]).strip()
+                    celda_prod_raw = str(row.iloc[1])
+                    celda_precio_raw = str(row.iloc[2])
                 except IndexError:
                     continue 
+                
+                # 🧹 ASPIRADORA EXTREMA: Mata saltos de línea (\n) y espacios múltiples
+                celda_prod = " ".join(celda_prod_raw.split())
+                celda_precio = " ".join(celda_precio_raw.split())
                     
                 if not celda_prod or celda_prod.lower() in ['nan', 'descripción', 'codigo', 'módulos']:
                     continue
+                
+                # 🔋 INYECTOR DE CATEGORÍAS (Para el problema de Skyphon)
+                # Si la hoja de Excel dice "Baterias" y el producto no lo dice, se lo agregamos.
+                if "BAT" in nombre_hoja.upper() and "BATERIA" not in celda_prod.upper():
+                    celda_prod = f"Batería {celda_prod}"
                     
-                # 🚫 FILTRO DE BASURA: Si dice mecanico y no tiene alternativas (Crown/Premium), lo volamos
+                # 🚫 FILTRO DE BASURA MECÁNICA
                 prod_upper = celda_prod.upper()
                 if "MECANICO" in prod_upper and not any(buena in prod_upper for buena in ["CROWN", "PREMIUM", "OLED"]):
-                    continue # Se ignora completamente
+                    continue 
                     
                 if "$" in celda_precio or celda_precio.replace('.', '').isdigit():
                     precio_num = limpiar_precio(celda_precio)
                     
                     if precio_num > 0:
                         calidad = clasificar_calidad_skyphon(celda_prod)
-                        
-                        # Limpiamos el texto para la base de datos
                         prod_limpio = celda_prod.replace("C/M", "CON MARCO").replace("c/m", "CON MARCO")
-                        # Borramos la palabra MECANICO si venía mezclada con CROWN
                         prod_limpio = re.sub(r'(?i)/?MECANICO/?', ' ', prod_limpio).strip()
                         
                         nombre_final = f"[CALIDAD: {calidad}] {prod_limpio} - SKYPHON"
