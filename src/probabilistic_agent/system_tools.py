@@ -109,13 +109,24 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
         modelo_limpio = modelo_limpio.strip()
         if not modelo_limpio: modelo_limpio = modelo.upper()
             
-        # 3. 🧠 EXPANSIÓN DE BASE DE DATOS (Soluciona que Supabase esconda el G05)
-        variantes_db = [modelo_limpio]
-        for t in modelo_limpio.split():
-            if len(t) == 2 and t[0].isalpha() and t[1].isdigit():
-                variantes_db.append(f"{t[0]}0{t[1]}") # Agrega G05
-            elif len(t) == 3 and t[0].isalpha() and t[1] == '0' and t[2].isdigit():
-                variantes_db.append(f"{t[0]}{t[2]}") # Agrega G5
+        # 3. 🧠 EXPANSIÓN DE BASE DE DATOS MEJORADA (Búsqueda inteligente)
+        tokens = modelo_limpio.split()
+        
+        # Extraemos el modelo base (Ej: saca "A16" de "A16 4G")
+        token_principal = tokens[0] if tokens else modelo_limpio
+        
+        # Si el cliente pone espacios extra (ej: "A 16" o "G 52"), unimos las partes
+        if len(token_principal) == 1 and len(tokens) > 1:
+            token_principal = f"{tokens[0]}{tokens[1]}"
+            
+        # Pedimos a Supabase que traiga TODO lo relacionado al modelo base
+        variantes_db = [token_principal]
+        
+        # Variantes de ceros (Ej: busca G05 si escriben G5)
+        if len(token_principal) == 2 and token_principal[0].isalpha() and token_principal[1].isdigit():
+            variantes_db.append(f"{token_principal[0]}0{token_principal[1]}") 
+        elif len(token_principal) == 3 and token_principal[0].isalpha() and token_principal[1] == '0' and token_principal[2].isdigit():
+            variantes_db.append(f"{token_principal[0]}{token_principal[2]}") 
                 
         # Le decimos a Supabase: Busca G5 "O" G05
         filtro_or = ",".join([f"nombre_consolidado.ilike.%{v}%" for v in variantes_db if v])
