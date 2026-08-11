@@ -1,6 +1,5 @@
 import os
 import math
-import pandas as pd
 from dotenv import load_dotenv
 from supabase import create_client
 from langchain_core.tools import tool
@@ -11,14 +10,10 @@ from src.probabilistic_agent.sync_i2c import buscar_en_i2c
 load_dotenv()
 supabase = create_client(os.environ.get("SUPABASE_URL"), os.environ.get("SUPABASE_KEY"))
 
-# ⚠️ PONÉ ACÁ EL LINK DEL SPREADSHEET DE JOA 
-URL_CALCULADORA_JOA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRQURuzYgPzF-_Uf9khnmEz36mVaMZQdg6UVsvdKFNbe1aA6YMDBfFqdZX4DeK1cAlyldNH72nFqsTk/pub?gid=256169068&single=true&output=csv"
-
 @tool
 def consultar_inventario_local(client_id: str, busqueda_cliente: str) -> str:
     """Busca productos locales de Joa."""
     try:
-        # ATENCIÓN AL CAMBIO: eq("cliente_id", client_id)
         respuesta = supabase.table("productos").select("nombre_consolidado, precio").eq("client_id", client_id).execute()
         resultados = respuesta.data
         if not resultados:
@@ -42,21 +37,16 @@ def solicitar_asistencia_humana(client_id: str, numero_cliente: str, motivo: str
     
     print(f"🚨 ALERTANDO A JOA: El cliente {numero_cliente} necesita ayuda. Resumen del bot: {motivo}")
     
-    # Los mismos datos de Meta que usamos en tu api_server.py
     TOKEN = "EAATkL1hn6uEBSMlVD9wREiuZCZAiWmJj1GIqvSGLMZAk6IS1YsvWHgXGkTs7km75wbMSiLLXfRCBiTrBWcOWZB4RJFZAo16KXwtN7cGOJCkCPNDrfwJRbr8awTkhKVH3bhr0KFUuy4NMh9muWNY0yHIzwANScFxPV1yCZC9g6fcZBvpKnKT10rQmuF9R8x26SphigZDZD"
     PHONE_ID = "1271041542753450" 
-    
-    # 👇 ACÁ PONÉS EL CELULAR PERSONAL DE JOA (Con código de país, ej: 549351XXXXXXX)
     NUMERO_DE_JOA = "5493510000000" 
     
     url = f"https://graph.facebook.com/v19.0/{PHONE_ID}/messages"
-    
     headers = {
         "Authorization": f"Bearer {TOKEN}",
         "Content-Type": "application/json"
     }
     
-    # Armamos el mensaje que le va a llegar al celular de Joa
     mensaje_para_joa = f"⚠️ *NUEVO CLIENTE DERIVADO* ⚠️\n\nEl bot acaba de pausarse para este número:\n📞 *{numero_cliente}*\n\n*📋 Resumen de la encuesta (Hecho por la IA):*\n{motivo}\n\nYa podés entrar a la bandeja de entrada para contestarle el presupuesto."
     
     data = {
@@ -66,10 +56,7 @@ def solicitar_asistencia_humana(client_id: str, numero_cliente: str, motivo: str
         "text": {"body": mensaje_para_joa}
     }
     
-    # Disparamos el mensaje a Joa
     req.post(url, headers=headers, json=data)
-    
-    # Le devolvemos este texto al bot para que sepa que hizo bien su trabajo
     return "Notificación enviada exitosamente a Joa con el resumen del diagnóstico. Ya puedes despedirte del cliente."
 
 @tool
@@ -100,64 +87,44 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
     PRIORIDAD_PROVEEDORES = ["proveedor_one_services", "proveedor_mundo_parts", "proveedor_skyphon"]
 
     try:
-        try:
-            # 🔥 ESCUDO PARA EL LINK: Cortamos la URL para evitar errores de Google
-            url_csv = URL_CALCULADORA_JOA.split("/edit")[0] + "/export?format=csv"
-            df_calc = pd.read_csv(url_csv)
-            
-            porcentajes = {"descuento_efectivo": 0.15, "recargo_3_cuotas": 1.18, "recargo_6_cuotas": 1.26}
-            
-            for idx, row in df_calc.iterrows():
-                texto = str(row.iloc[1]).lower()
-                valor_raw = str(row.iloc[2])
-                if "descuento efectivo" in texto and valor_raw != 'nan':
-                    porcentajes["descuento_efectivo"] = float(valor_raw.replace("%", "").strip()) / 100
-                elif "recargo 3 cuotas" in texto and valor_raw != 'nan':
-                    porcentajes["recargo_3_cuotas"] = 1 + (float(valor_raw.replace("%", "").strip()) / 100)
-                elif "recargo 6 cuotas" in texto and valor_raw != 'nan':
-                    porcentajes["recargo_6_cuotas"] = 1 + (float(valor_raw.replace("%", "").strip()) / 100)
-                    
-            tramos = []
-            for idx, row in df_calc.iterrows():
-                desde_str = str(row.iloc[4]).replace("$", "").replace(",", "").strip()
-                hasta_str = str(row.iloc[5]).replace("$", "").replace(",", "").strip()
-                monto_str = str(row.iloc[6]).replace("$", "").replace(",", "").strip()
-                
-                if desde_str.replace(".", "").isdigit() and monto_str.replace(".", "").isdigit():
-                    tramos.append({
-                        "desde": float(desde_str),
-                        "hasta": float(hasta_str),
-                        "sumar": float(monto_str)
-                    })
-        except Exception as e:
-            print(f"🚨 Error leyendo Excel de Joa: {e}")
-            tramos = []
-            porcentajes = {"descuento_efectivo": 0.15, "recargo_3_cuotas": 1.18, "recargo_6_cuotas": 1.26}
+        # Descargar la matriz guardada por sync_excel.py
+        respuesta_matriz = supabase.table("configuracion_clientes").select("reglas_calculadora").eq("client_id", "matriz_calculo_interna").execute()
+        
+        matriz_default = {"tramos": [], "descuento_efectivo": 0.15, "recargo_3_cuotas": 0.18, "recargo_6_cuotas": 0.26}
+        matriz_raw = respuesta_matriz.data[0]["reglas_calculadora"] if respuesta_matriz.data else json.dumps(matriz_default)
+        matriz_data = json.loads(matriz_raw)
 
         def aplicar_calculadora(costo_base):
-            # 🔥 ESCUDO ANTI-CRASH MATEMÁTICO: Forzamos a número puro
+            tramos = matriz_data.get("tramos", [])
+            dto = matriz_data.get("descuento_efectivo", 0.15)
+            rec_3 = matriz_data.get("recargo_3_cuotas", 0.18)
+            rec_6 = matriz_data.get("recargo_6_cuotas", 0.26) 
+            
+            # 🔥 ESCUDO MATEMÁTICO: Forzamos a número puro para evitar el crash de i2c
             try:
                 if isinstance(costo_base, str):
-                    costo = float(costo_base.replace('$', '').replace(' ', '').strip())
+                    costo = float(costo_base.replace('$', '').replace(',', '').replace(' ', '').strip())
                 else:
                     costo = float(costo_base)
-            except:
+            except Exception:
                 costo = 0.0
 
             monto_a_sumar = 35000 
+            
             for tramo in tramos:
                 if tramo["desde"] <= costo <= tramo["hasta"]:
                     monto_a_sumar = tramo["sumar"]
                     break
                     
             lista = costo + monto_a_sumar
-            efectivo = lista * (1 - porcentajes["descuento_efectivo"])
-            tarjeta_3 = lista * porcentajes["recargo_3_cuotas"]
-            tarjeta_6 = lista * porcentajes["recargo_6_cuotas"]
+            efectivo = lista * (1 - dto)
+            tarjeta_3 = lista * (1 + rec_3)
+            tarjeta_6 = lista * (1 + rec_6)
             
             return (int(lista), int(efectivo), int(tarjeta_3), int(tarjeta_3 / 3), int(tarjeta_6), int(tarjeta_6 / 6))
             
         def formato_miles(numero):
+            """Convierte 45500 a '45.500'"""
             return f"{int(numero):,}".replace(",", ".")
 
         marcas_a_ignorar = ["SAMSUNG", "MOTOROLA", "MOTO", "XIAOMI", "APPLE", "IPHONE", "LG", "NOKIA"]
@@ -181,6 +148,7 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
         for proveedor in PRIORIDAD_PROVEEDORES:
             respuesta = supabase.table("productos").select("*").eq("client_id", proveedor).or_(filtro_or).execute()
             resultados = respuesta.data
+            
             if not resultados: continue 
                 
             for rep in resultados:
@@ -195,6 +163,7 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
                 if coincide_tipo:
                     nombre_limpio_sku = nombre_bd.replace('/', ' ').replace('-', ' ').replace('(', ' ').replace(')', ' ')
                     nombre_pad = f" {nombre_limpio_sku} "
+                    
                     coincide_todo = True
                     for t in modelo_limpio.split():
                         t_str = str(t).strip()
@@ -209,9 +178,11 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
                             if f" {variante} " in nombre_pad:
                                 encontrado = True
                                 break 
+                                
                         if not encontrado:
                             coincide_todo = False
                             break
+                    
                     if coincide_todo:
                         repuestos_filtrados.append(rep)
 
@@ -224,10 +195,11 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
                 if "MARCO" in nombre_i2c:
                     if "SERVICE PACK" not in nombre_i2c and "ORIGINAL" not in nombre_i2c:
                         continue
+                
                 repuestos_filtrados.append({
                     'nombre_consolidado': f"[CALIDAD: {r_i2c['producto'].replace('Pantalla ', '')}] {r_i2c['producto']} {modelo_limpio}",
                     'precio': r_i2c['precio_costo'],
-                    'client_id': 'i2c' # 🔥 Agregamos esto para que se ordene bien
+                    'client_id': 'i2c'
                 })
         
         if not repuestos_filtrados:
@@ -240,8 +212,10 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
 
         for r in repuestos_filtrados:
             n = r['nombre_consolidado'].upper()
-            if "SERVICE PACK" in n: originales.append(r)
-            else: normales.append(r)
+            if "SERVICE PACK" in n:
+                originales.append(r)
+            else:
+                normales.append(r)
 
         def obtener_peso_proveedor(r):
             id_prov = r.get('client_id', r.get('proveedor', ''))
@@ -259,14 +233,18 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
             elif "INCELL" in n: peso_calidad = 4
             return float(f"{peso_calidad}.{obtener_peso_proveedor(r)}")
 
-        def prio_original(r): return obtener_peso_proveedor(r)
+        def prio_original(r):
+            return obtener_peso_proveedor(r)
 
         normales_ordenados = sorted(normales, key=prio_normal)
         originales_ordenados = sorted(originales, key=prio_original)
 
         mejores_opciones = []
-        if normales_ordenados: mejores_opciones.append(normales_ordenados[0])
-        elif originales_ordenados: mejores_opciones.append(originales_ordenados[0])
+        
+        if normales_ordenados:
+            mejores_opciones.append(normales_ordenados[0])
+        elif originales_ordenados: 
+            mejores_opciones.append(originales_ordenados[0])
 
         if originales_ordenados and originales_ordenados[0] not in mejores_opciones:
             mejores_opciones.append(originales_ordenados[0])
@@ -280,6 +258,7 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
                 INSTRUCCIÓN IA: TIENES PROHIBIDO DAR EL PRECIO. Dile ágilmente al cliente: 'Che, te cuento que ese repuesto es de alta gama. Ahí te derivo con uno de mis compañeros para que te arme una cotización a medida.'
                 OBLIGATORIO: Agrega al final de tu respuesta la etiqueta secreta: [ASISTENCIA_HUMANA]"""
 
+            # 🔥 TEXTO EXACTO CON EL FORMATO DE JOA
             mensaje_joa = (
                 f"Precio de lista / 1 cuota: ${formato_miles(lista)}\n"
                 f"3 cuotas de ${formato_miles(cuota_3)} c/u\n"
@@ -290,7 +269,7 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
             opciones_texto += f"Opción {i+1}: {r['nombre_consolidado']}\n{mensaje_joa}\n\n"
         
         instruccion_final = """INSTRUCCIÓN IA: Aplica tu ESTRATEGIA DE VENTA DE PANTALLAS. 
-        Ofrece SIEMPRE SOLO LA OPCIÓN 1 por defecto transcribiendo EXACTAMENTE el formato de precios con cuotas. No menciones marcas raras. 
+        Ofrece SIEMPRE SOLO LA OPCIÓN 1 por defecto transcribiendo EXACTAMENTE el formato de precios con cuotas que recibiste. No menciones marcas raras. 
         Si recibiste una Opción 2 que es Original/Service Pack, guárdatela en silencio bajo la manga. SOLO ofrécela si el cliente pregunta explícitamente si es original."""
 
         return f"ATENCIÓN: Encontré stock. Estos son los datos de sistema (copia el formato de precios):\n{opciones_texto}\n{instruccion_final}"
