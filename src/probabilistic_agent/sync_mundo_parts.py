@@ -11,13 +11,32 @@ supabase: Client = create_client(
     os.environ.get("SUPABASE_KEY")
 )
 
-URL_GOOGLE_SHEETS = "https://docs.google.com/spreadsheets/d/1c39kYssBH8TWE4JPZ8c4xy9OJ4RnsCme/edit?usp=sharing&ouid=118424615442179350058&rtpof=true&sd=true"
+# ⚠️ PEGÁ ACÁ EL LINK DE GOOGLE SHEETS DE MUNDO PARTS (Asegurate de usar tu link real largo)
+URL_GOOGLE_SHEETS = "https://docs.google.com/spreadsheets/d/1c39kYssBH8TWE4JPZ8c4xy9OJ4RnsCme/edit?usp=sharing"
 
 def limpiar_precio(precio_str):
     try:
-        limpio = re.sub(r'[^\d]', '', str(precio_str))
-        return float(limpio)
-    except:
+        p_str = str(precio_str).strip()
+        
+        # Si tiene el símbolo de pesos, extraemos los números directo
+        if "$" in p_str:
+            limpio = re.sub(r'[^\d]', '', p_str)
+            return float(limpio)
+        
+        # Si es un número puro desde Excel (Traductor Argentino)
+        try:
+            val = float(p_str)
+            # Si Python lee "3.5" (porque el Excel tenía 3.500), lo acomodamos a miles.
+            if 0 < val < 100:
+                val = val * 1000
+            return val
+        except ValueError:
+            limpio = re.sub(r'[^\d]', '', p_str)
+            if limpio:
+                return float(limpio)
+            return 0.0
+            
+    except Exception:
         return 0.0
 
 def quitar_tildes(texto):
@@ -62,13 +81,13 @@ def sincronizar_mundo_parts():
                 continue
                 
             print(f"📄 Procesando hoja: {nombre_hoja}...")
+            encontrados_en_hoja = 0
             
             for index, row in df.iterrows():
                 for col_idx in range(len(df.columns) - 1):
                     celda_prod_raw = str(row.iloc[col_idx])
                     celda_precio_raw = str(row.iloc[col_idx + 1])
                     
-                    # 🧹 ASPIRADORA EXTREMA: Mata saltos de línea (\n) y espacios múltiples
                     celda_prod = " ".join(celda_prod_raw.split())
                     celda_precio = " ".join(celda_precio_raw.split())
                     
@@ -77,16 +96,16 @@ def sincronizar_mundo_parts():
                     if "precio" in celda_prod.lower() or "mundo parts" in celda_prod.lower():
                         continue
                         
-                    # 🔋 INYECTOR DE CATEGORÍAS (Por si Mundo Parts tampoco pone la palabra)
+                    # INYECTOR DE BATERÍAS
                     if "BAT" in nombre_hoja.upper() and "BATERIA" not in celda_prod.upper():
-                        celda_prod = f"Batería {celda_prod}"
+                        celda_prod = f"BATERIA {celda_prod}"
                     
-                    # 🚫 FILTRO DE BASURA MECÁNICA
                     prod_upper = celda_prod.upper()
                     if "MECANICO" in prod_upper and not any(buena in prod_upper for buena in ["CROWN", "PREMIUM", "OLED"]):
                         continue
                         
-                    if "$" in celda_precio or celda_precio.replace('.', '').isdigit():
+                    # EL RADAR DETECTA SI HAY DINERO AL LADO (Regla corregida)
+                    if "$" in celda_precio or celda_precio.replace('.', '').replace(',', '').isdigit():
                         precio_num = limpiar_precio(celda_precio)
                         
                         if precio_num > 0:
@@ -103,16 +122,28 @@ def sincronizar_mundo_parts():
                                 "stock": 99
                             }
                             lote_total.append(producto_db)
+                            encontrados_en_hoja += 1
                             
-        lote_unico = {p['nombre_consolidado']: p for p in lote_total}.values()
+            print(f"   -> ✔️ Se encontraron {encontrados_en_hoja} repuestos en {nombre_hoja}.")
+                            
+        # Limpiamos duplicados exactos
+        lote_unico = list({p['nombre_consolidado']: p for p in lote_total}.values())
+        total_repuestos = len(lote_unico)
         
-        if lote_unico:
-            print(f"\n📦 Extracción completa. {len(lote_unico)} repuestos listos de Mundo Parts.")
+        if total_repuestos > 0:
+            print(f"\n📦 Extracción completa. Intentando subir {total_repuestos} repuestos a Supabase...")
             supabase.table("productos").delete().eq("client_id", "proveedor_mundo_parts").execute()
-            supabase.table("productos").insert(list(lote_unico)).execute()
+            
+            # SUBIDA EN CAJAS DE A 500 PARA QUE SUPABASE NO FALLE
+            tamanio_lote = 500
+            for i in range(0, total_repuestos, tamanio_lote):
+                caja = lote_unico[i : i + tamanio_lote]
+                supabase.table("productos").insert(caja).execute()
+                print(f"   -> Subida caja {i//tamanio_lote + 1}: {len(caja)} repuestos.")
+                
             print("✅ Catálogo de Mundo Parts subido a Supabase exitosamente.")
         else:
-            print("⚠️ No se encontraron productos con formato válido para extraer.")
+            print("⚠️ No se encontraron productos.")
 
     except Exception as e:
         print(f"🚨 Error crítico al sincronizar Mundo Parts: {e}")
