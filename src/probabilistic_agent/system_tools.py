@@ -109,25 +109,31 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
         modelo_limpio = modelo_limpio.strip()
         if not modelo_limpio: modelo_limpio = modelo.upper()
             
-        # 3. 🧠 EXPANSIÓN DE BASE DE DATOS MEJORADA (Búsqueda inteligente)
+        # 3. 🧠 EXPANSIÓN DE BASE DE DATOS MEJORADA (Búsqueda inteligente con escudo)
         tokens = modelo_limpio.split()
         
-        # Extraemos el modelo base (Ej: saca "A16" de "A16 4G")
+        # Extraemos el modelo base
         token_principal = tokens[0] if tokens else modelo_limpio
         
-        # Si el cliente pone espacios extra (ej: "A 16" o "G 52"), unimos las partes
+        # Escudo: Si el cliente pone "A 16" o "G 52", unimos las partes
         if len(token_principal) == 1 and len(tokens) > 1:
             token_principal = f"{tokens[0]}{tokens[1]}"
             
+        # ESCUDO DE RENDIMIENTO: Si el token principal es muy genérico (ej: "NOTE"), 
+        # forzamos a usar las dos primeras palabras ("NOTE 13") para no colapsar la base de datos.
+        palabras_peligrosas = ["NOTE", "GALAXY", "REDMI", "MOTO", "EDGE", "POCO"]
+        if token_principal in palabras_peligrosas and len(tokens) > 1:
+            token_principal = f"{tokens[0]} {tokens[1]}"
+
         # Pedimos a Supabase que traiga TODO lo relacionado al modelo base
         variantes_db = [token_principal]
         
         # Variantes de ceros (Ej: busca G05 si escriben G5)
-        if len(token_principal) == 2 and token_principal[0].isalpha() and token_principal[1].isdigit():
-            variantes_db.append(f"{token_principal[0]}0{token_principal[1]}") 
-        elif len(token_principal) == 3 and token_principal[0].isalpha() and token_principal[1] == '0' and token_principal[2].isdigit():
-            variantes_db.append(f"{token_principal[0]}{token_principal[2]}") 
-                
+        t_limpio = token_principal.replace(" ", "") # Limpiamos espacios por las dudas
+        if len(t_limpio) == 2 and t_limpio[0].isalpha() and t_limpio[1].isdigit():
+            variantes_db.append(f"{t_limpio[0]}0{t_limpio[1]}") 
+        elif len(t_limpio) == 3 and t_limpio[0].isalpha() and t_limpio[1] == '0' and t_limpio[2].isdigit():
+            variantes_db.append(f"{t_limpio[0]}{t_limpio[2]}") 
         # Le decimos a Supabase: Busca G5 "O" G05
         filtro_or = ",".join([f"nombre_consolidado.ilike.%{v}%" for v in variantes_db if v])
         
