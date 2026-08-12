@@ -153,46 +153,38 @@ def asignar_agente_chatwoot(conversation_id: str, agente_id: int = 0):
         print(f"🚨 Excepción asignando agente: {e}")
 
 def recuperar_historial_chatwoot(conversation_id: str):
-    """Va a buscar los últimos mensajes a Chatwoot y los formatea como un resumen de contexto seguro para el Agente."""
+    """Va a buscar los últimos mensajes a Chatwoot y los inyecta como memoria nativa perfecta."""
     url = f"{CHATWOOT_URL}/api/v1/accounts/{ACCOUNT_ID}/conversations/{conversation_id}/messages"
     headers = {
         "api_access_token": API_TOKEN,
         "Content-Type": "application/json"
     }
     
-    historial_texto = "[HISTORIAL DE CHARLA PREVIA RECUPERADO]\n"
-    mensajes_validos = 0
+    historial = []
     
     try:
         respuesta = req.get(url, headers=headers)
         if respuesta.status_code == 200:
             mensajes = respuesta.json().get("payload", [])
             
-            # Traemos los últimos 15 para tener buen contexto
+            # Traemos los últimos 15 mensajes
             for msg in reversed(mensajes[:15]): 
                 es_privado = msg.get("private", False)
                 tipo = msg.get("message_type")
-                contenido = msg.get("content")
+                contenido = msg.get("content", "").strip()
                 
                 if contenido and not es_privado:
                     if tipo == 0:  # Cliente
-                        historial_texto += f"Cliente: {contenido}\n"
-                        mensajes_validos += 1
+                        historial.append(HumanMessage(content=contenido))
                     elif tipo == 1:  # Bot o Joa
                         # Evitamos que lea alertas o derivaciones
                         if "🛑" not in contenido and "[ASISTENCIA_HUMANA]" not in contenido:
-                            historial_texto += f"Gaspar: {contenido}\n"
-                            mensajes_validos += 1
+                            historial.append(AIMessage(content=contenido))
                             
     except Exception as e:
         print(f"🚨 Error recuperando memoria de Chatwoot: {e}")
         
-    if mensajes_validos > 0:
-        # Lo inyectamos como UN SOLO mensaje de contexto humano. Así el bot no se buggea intentando buscar las herramientas.
-        historial_texto += "--- FIN DEL HISTORIAL PREVIO ---\n(Instrucción oculta de sistema: Lee este historial para tener contexto de qué hablaron. NO repitas precios antiguos y NO vuelvas a enviar la dirección de Google Maps si ya figura acá arriba)."
-        return [HumanMessage(content=historial_texto)]
-        
-    return []
+    return historial
 
 # ========================================================
 # 🧠 TAREA DE FONDO (Procesa con Gemini y responde)
