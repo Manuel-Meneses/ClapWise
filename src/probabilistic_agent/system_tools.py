@@ -163,7 +163,9 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
                     nombre_pad = f" {nombre_limpio_sku} "
                     
                     coincide_todo = True
-                    for t in modelo_limpio.split():
+                    tokens_busqueda = modelo_limpio.split()
+                    
+                    for t in tokens_busqueda:
                         t_str = str(t).strip()
                         variantes_termino = [t_str]
                         if len(t_str) == 2 and t_str[0].isalpha() and t_str[1].isdigit():
@@ -177,12 +179,18 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
                                 encontrado = True
                                 break 
                                 
+                        # 🔥 ESCUDO INTELIGENTE PARA EL 4G:
+                        # Si el cliente pide 4G pero el proveedor no lo escribió, lo dejamos pasar, 
+                        # SIEMPRE Y CUANDO el repuesto en la base de datos no diga explícitamente "5G".
                         if not encontrado:
-                            coincide_todo = False
-                            break
+                            if t_str == "4G" and " 5G " not in nombre_pad:
+                                encontrado = True
+                            else:
+                                coincide_todo = False
+                                break
                     
                     if coincide_todo:
-                        repuestos_filtrados.append(rep)
+                        repuestos_filtrados.append(rep) 
 
         # ---------------------------------------------------------
         # BUSQUEDA 2: PLAN B (Buscamos SIEMPRE en i2c para tener el As bajo la manga)
