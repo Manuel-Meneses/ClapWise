@@ -208,10 +208,12 @@ def buscar_costo_repuesto_real(modelo: str, tipo_repuesto: str) -> str:
         # PROCESAMIENTO FINAL, FILTRADO Y ORDEN
         # ---------------------------------------------------------
         if not repuestos_filtrados:
-            return """ATENCIÓN: Búsqueda completada. 0 resultados en la base de datos y proveedores externos.
-            INSTRUCCIÓN IA: Dile al cliente rápido y sin vueltas que no te figura stock en sistema, pero que "ahí le aviso a los chicos". No des más explicaciones.
-            OBLIGATORIO: Agrega al final de tu respuesta la etiqueta secreta: [ASISTENCIA_HUMANA]"""
-
+            return """🛑 ALERTA DE SISTEMA (PRIORIDAD MÁXIMA):
+            El buscador arrojó 0 RESULTADOS. No hay stock ni precio para este repuesto.
+            REGLA ESTRICTA: TIENES TOTALMENTE PROHIBIDO dar un precio. NO mires el historial de chat, NO inventes números.
+            TU ÚNICA RESPUESTA PERMITIDA ES EXACTAMENTE ESTA: "No me figura stock de ese repuesto en el sistema ahora mismo. De todas formas, ahí le aviso a los chicos del taller para que revisen si lo podemos conseguir."
+            OBLIGATORIO: Agrega al final la etiqueta secreta: [ASISTENCIA_HUMANA]"""
+             
         # 🔥 NUEVO SISTEMA NINJA DE PRIORIDADES (CALIDAD + PROVEEDOR): 
         normales = []
         originales = []
