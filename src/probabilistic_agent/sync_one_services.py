@@ -102,14 +102,14 @@ def sincronizar_one_services():
                     calidad_tag = "[CALIDAD: HARD OLED]"
                 elif "OLED" in producto and "MARCO" in producto:
                     calidad_tag = "[CALIDAD: OLED CON MARCO]"
-                elif "OLED" in producto or "PREMIUM" in producto or "ORIG" in producto:
-                    calidad_tag = "[CALIDAD: OLED / ORIGINAL]"
+                elif "OLED" in producto or "PREMIUM" in producto or "ORIG" in producto or "ORIGINAL" in producto:
+                    calidad_tag = "[CALIDAD: OLED ]"
                 elif "SUNLONG" in producto or "JK" in producto:
                     calidad_tag = "[CALIDAD: SUNLONG (Segunda Instancia/Alternativa Superior)]"
                 elif "INCELL" in producto:
                     calidad_tag = "[CALIDAD: INCELL (Básica/Para zafar)]"
                 else:
-                    calidad_tag = "[CALIDAD: ESTÁNDAR]"
+                    calidad_tag = "[CALIDAD: OLED]" # 🔥 EL CAMBIO: Ahora asume OLED por defecto
                     
                 nombre_completo = f"{calidad_tag} {categoria} {marca} {producto}"
                 
