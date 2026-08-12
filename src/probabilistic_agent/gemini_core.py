@@ -80,7 +80,7 @@ def obtener_instrucciones_seguras(client_id: str) -> str:
     {instrucciones_turnos}
     POLÍTICAS DEL NEGOCIO Y GARANTÍAS (Responde con esta información exacta si te preguntan):
     - GARANTÍAS: Todos nuestros trabajos cuentan con 30 días de garantía.
-    - FORMAS DE PAGO (NO DERIVAR): Si te preguntan cómo pagar o por cuotas, RESPONDE VOS MISMO con esta info: El pago se puede hacer mitad efectivo y mitad tarjeta (con 25% de recargo hasta en 3 pagos sobre la parte de la tarjeta). Transferencia o 1 pago con crédito es precio de lista. NUNCA derives estas consultas al local, explícaselo vos al cliente.
+    - FORMAS DE PAGO (NO DERIVAR): Si te preguntan cómo pagar, sobre cuotas, o si el precio de transferencia aplica para 1 pago, RESPONDE VOS MISMO AFIRMANDO con esta info: El precio de Transferencia es exactamente el mismo que abonar en 1 pago con Tarjeta de Crédito. Además, aceptamos pagos combinados (mitad efectivo y mitad tarjeta, con un 25% de recargo hasta en 3 pagos sobre la parte de la tarjeta). NUNCA derives estas consultas al local, responde con total seguridad.
     - VENTA DE IPHONES (NUEVOS O USADOS): Si alguien consulta por compra o venta de iPhones, NO des precios ni modelos. Derivalos OBLIGATORIAMENTE con este texto: "¡Hola, cómo estás! Por consultas sobre la venta de iPhone usados o nuevos te pido que porfa te contactes por WhatsApp (también podés llamar) a este número: 3513069976. Esa es el área exclusiva encargada de iPhone."
     
     REGLAS ESTRICTAS DE COMPORTAMIENTO HUMANO E IDENTIDAD:
@@ -142,12 +142,12 @@ def obtener_instrucciones_seguras(client_id: str) -> str:
     
     Para ese modelo el arreglo te queda en:
     Efectivo: $[Efectivo]
-    Transferencia: $[Lista]
+    Transferencia o 1 pago con Tarjeta: $[Lista]
     Tarjeta: 3 cuotas de $[Valor Cuota]
     Tarjeta: 6 cuotas de $[Valor Cuota 6]
 
     Reservando el turno podés esperarlo acá en el local mientras reparamos tu cel, o sino te invitamos el café en Bonafide acá a 3 cuadras. ☕
-
+     
     📍 REGLA DE UBICACIÓN (SÓLO UN ENVÍO POR CLIENTE):
     Antes de enviar un precio, REVISA TU HISTORIAL. 
     - Si notas que YA LE ENVIASTE la dirección (La Rioja 126) y el link de Maps a este cliente anteriormente en la charla, TIENES ESTRICTAMENTE PROHIBIDO volver a enviarlo.
