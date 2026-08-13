@@ -230,6 +230,8 @@ def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_
         
         # 👇 LÓGICA DE DERIVACIÓN ELIMINADA
         # Limpiamos la etiqueta por si Gaspar la sigue generando en su cerebro
+        # 👇 LÓGICA DE DERIVACIÓN ELIMINADA
+        # Limpiamos la etiqueta por si Gaspar la sigue generando en su cerebro
         respuesta_final = respuesta_final.replace("[ASISTENCIA_HUMANA]", "").strip()
         
         # 🔥 Sistema de múltiples burbujas (Saltos en WhatsApp) 🔥
@@ -239,6 +241,12 @@ def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_
         burbujas = respuesta_final.split("||")
         
         for burbuja in burbujas:
+            # 🛑 FRENO DE EMERGENCIA 🛑
+            # Revisamos si Joa clavó un /pausa mientras el bot estaba durmiendo los 4 segundos
+            if conversaciones_pausadas.get(conversation_id):
+                print(f"🛑 FRENO DE EMERGENCIA ACTIVADO: Abortando envío de burbujas pendientes en charla {conversation_id}.")
+                break # Rompe el ciclo y la IA se calla la boca inmediatamente
+                
             texto_burbuja = burbuja.strip()
             if texto_burbuja:  # Verificamos que no esté vacío
                 enviar_mensaje_chatwoot(conversation_id, texto_burbuja)
@@ -246,7 +254,7 @@ def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_
 
     except Exception as e:
         import traceback
-        print(f"🚨 Error crítico en el agente: {traceback.format_exc()}")
+        print(f"🚨 Error crítico en el agente: {traceback.format_exc()}") 
 
 # ========================================================
 # 📩 RECEPCIÓN DE MENSAJES (De Chatwoot hacia Render)
