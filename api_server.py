@@ -9,11 +9,11 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi.middleware.cors import CORSMiddleware
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
-# Importaciones de tu IA
-from src.probabilistic_agent.sync_excel import sincronizar_calculadora
-from src.probabilistic_agent.sync_one_services import sincronizar_one_services
 from src.probabilistic_agent.gemini_core import compilar_cerebro, obtener_instrucciones_seguras
-from src.probabilistic_agent.sync_mundo_parts import sincronizar_mundo_parts
+# Importaciones de tu IA
+from src.probabilistic_agent.sync_excel import sincronizar_todo
+from src.probabilistic_agent.gemini_core import compilar_cerebro, obtener_instrucciones_seguras
+# (Ya borramos las de One Services y Mundo Parts porque no existen más)
 
 # ========================================================
 # 🧠 MEMORIA RAM DE PAUSAS Y CONTROL
@@ -40,13 +40,12 @@ async def lifespan(app: FastAPI):
     print("⏰ Iniciando el reloj de automatización...")
     scheduler = BackgroundScheduler()
     print("🔄 Forzando sincronización inicial al encender el servidor...")
-    sincronizar_calculadora()
-    sincronizar_one_services()
-    sincronizar_mundo_parts()
     
-    scheduler.add_job(sincronizar_one_services, 'interval', hours=6)
-    scheduler.add_job(sincronizar_calculadora, 'interval', hours=12) 
-    scheduler.add_job(sincronizar_mundo_parts, 'interval', hours=6)
+    # 🚀 Ejecutamos el único script que lee el Excel completo de Joa
+    sincronizar_todo()
+    
+    # Programamos que revise el Excel cada 6 horas por si Joa cambió un precio
+    scheduler.add_job(sincronizar_todo, 'interval', hours=6)
     
     scheduler.start()
     yield
