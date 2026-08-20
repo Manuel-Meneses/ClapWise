@@ -173,6 +173,7 @@ def compilar_cerebro(client_id: str):
         generar_link_pago,
         buscar_costo_repuesto_real 
     ]
+
     
     agente = create_react_agent(llm, herramientas)
 
