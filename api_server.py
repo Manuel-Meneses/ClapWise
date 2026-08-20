@@ -151,7 +151,6 @@ def asignar_agente_chatwoot(conversation_id: str, agente_id: int = 0):
             print(f"❌ Error asignando agente: {respuesta.text}")
     except Exception as e:
         print(f"🚨 Excepción asignando agente: {e}")
-
 def recuperar_historial_chatwoot(conversation_id: str):
     """Va a buscar los últimos mensajes a Chatwoot y los inyecta como memoria nativa perfecta."""
     url = f"{CHATWOOT_URL}/api/v1/accounts/{ACCOUNT_ID}/conversations/{conversation_id}/messages"
@@ -167,8 +166,14 @@ def recuperar_historial_chatwoot(conversation_id: str):
         if respuesta.status_code == 200:
             mensajes = respuesta.json().get("payload", [])
             
-            # Traemos los últimos 15 mensajes
-            for msg in reversed(mensajes[:15]): 
+            # 🔧 FIX (Sugerencia de Claude): Ordenamos SIEMPRE por created_at ascendente 
+            # para no depender del orden crudo que devuelva la API de Chatwoot.
+            mensajes_ordenados = sorted(mensajes, key=lambda m: m.get("created_at", 0))
+            
+            # Tomamos los últimos 15 (los más recientes, en orden cronológico perfecto)
+            ultimos = mensajes_ordenados[-15:]
+            
+            for msg in ultimos:
                 es_privado = msg.get("private", False)
                 tipo = msg.get("message_type")
                 contenido = msg.get("content", "").strip()
@@ -185,7 +190,6 @@ def recuperar_historial_chatwoot(conversation_id: str):
         print(f"🚨 Error recuperando memoria de Chatwoot: {e}")
         
     return historial
-
 # ========================================================
 # 🧠 TAREA DE FONDO (Procesa con Gemini y responde)
 # ========================================================
@@ -200,8 +204,15 @@ def procesar_y_responder_fondo(texto_cliente: str, sender_id: str, conversation_
         historial = [SystemMessage(content=instrucciones, id="instrucciones_base_unicas")]
         
         # 2. 🔥 EXTRACCIÓN DE MEMORIA CONTINUA
-        # Como el bot ahora no tiene memoria, Chatwoot ES nuestra única memoria.
         mensajes_viejos = recuperar_historial_chatwoot(conversation_id)
+        
+        # 🔧 FIX ANTI-DUPLICADOS: 
+        # Como esperamos 7 segundos, los mensajes nuevos que mandó el cliente YA están adentro de 'mensajes_viejos'.
+        # Lo que hacemos acá es eliminar (pop) TODOS los mensajes finales que sean del cliente, 
+        # porque los vamos a inyectar nosotros mismos empaquetados en la variable 'texto_cliente' (junto con las notas ocultas).
+        while mensajes_viejos and isinstance(mensajes_viejos[-1], HumanMessage):
+            mensajes_viejos.pop()
+            
         if mensajes_viejos:
             historial.extend(mensajes_viejos)
             
