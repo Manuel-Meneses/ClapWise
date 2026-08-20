@@ -405,9 +405,7 @@ async def recibir_mensaje_chatwoot(request: Request, background_tasks: Backgroun
                             # Procesamos de forma asíncrona para no bloquear el servidor
                             await asyncio.to_thread(procesar_y_responder_fondo, mensaje_unido, s_id, conv_id, u_meta, r_social)
 
-                # Creamos la tarea de la sala de espera
-                asyncio.create_task(esperar_y_procesar(conversation_id, sender_id, usuario_meta, red_social, nota_tiempo))
-                
+                background_tasks.add_task(esperar_y_procesar, conversation_id, sender_id, usuario_meta, red_social, nota_tiempo)
         return {"status": "ok"}
         
     except Exception as e:
